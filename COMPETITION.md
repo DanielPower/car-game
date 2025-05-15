@@ -176,8 +176,13 @@ The input and output buffers use the following memory layout:
 3. turnLeft (non-zero means true)
 4. turnRight (non-zero means true)
 
-### Sample AI
-A sample AI implementation in C is provided in the `src/ai/wasm-sample` directory. You can use this as a starting point for your own AI.
+### Sample AI Implementations
+
+We provide sample AI implementations in multiple languages to help you get started:
+
+#### C Sample (`src/ai/wasm-sample`)
+
+A basic implementation in C that demonstrates the core concepts.
 
 ```c
 #include <stdlib.h>
@@ -258,8 +263,135 @@ void cleanup() {
 }
 ```
 
+#### Rust Sample (`src/ai/rust-sample`)
+
+A Rust implementation that shows how to create an AI in a memory-safe language:
+
+```rust
+// Sample AI implementation in Rust for the car game
+
+// Static buffers for input and output
+static mut INPUT_BUFFER: [f64; 9] = [0.0; 9];
+static mut OUTPUT_BUFFER: [f64; 4] = [0.0; 4];
+
+// Export functions for the game to call
+#[no_mangle]
+pub extern "C" fn allocate_input() -> *mut f64 {
+    unsafe { INPUT_BUFFER.as_mut_ptr() }
+}
+
+#[no_mangle]
+pub extern "C" fn allocate_output() -> *mut f64 {
+    unsafe { OUTPUT_BUFFER.as_mut_ptr() }
+}
+
+#[no_mangle]
+pub extern "C" fn process() {
+    unsafe {
+        // Extract input values
+        let x = INPUT_BUFFER[0];
+        let speed = INPUT_BUFFER[2];
+        let road_width = INPUT_BUFFER[6];
+        
+        // Simple AI logic: stay in the center of the road
+        let road_center_x = road_width / 2.0;
+        
+        // Accelerate if going slow, brake if going too fast
+        OUTPUT_BUFFER[0] = if speed < 200.0 { 1.0 } else { 0.0 }; // accelerate
+        OUTPUT_BUFFER[1] = if speed > 300.0 { 1.0 } else { 0.0 }; // brake
+        
+        // Turn towards the center of the road
+        if x < road_center_x - 10.0 {
+            OUTPUT_BUFFER[2] = 0.0; // turnLeft
+            OUTPUT_BUFFER[3] = 1.0; // turnRight
+        } else if x > road_center_x + 10.0 {
+            OUTPUT_BUFFER[2] = 1.0; // turnLeft
+            OUTPUT_BUFFER[3] = 0.0; // turnRight
+        } else {
+            OUTPUT_BUFFER[2] = 0.0; // turnLeft
+            OUTPUT_BUFFER[3] = 0.0; // turnRight
+        }
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn cleanup() {
+    // Nothing to clean up with this approach
+}
+```
+
+#### Go Sample (`src/ai/go-sample`)
+
+A Go implementation that demonstrates WebAssembly integration:
+
+```go
+package main
+
+// Sample AI implementation in Go for the car game
+
+// Static buffers for input and output
+var inputBuffer [9]float64
+var outputBuffer [4]float64
+
+//export allocate_input
+func allocate_input() *float64 {
+	return &inputBuffer[0]
+}
+
+//export allocate_output
+func allocate_output() *float64 {
+	return &outputBuffer[0]
+}
+
+//export process
+func process() {
+	// Extract input values
+	x := inputBuffer[0]
+	speed := inputBuffer[2]
+	roadWidth := inputBuffer[6]
+	
+	// Simple AI logic: stay in the center of the road
+	roadCenterX := roadWidth / 2.0
+	
+	// Accelerate if going slow, brake if going too fast
+	if speed < 200.0 {
+		outputBuffer[0] = 1.0 // accelerate
+	} else {
+		outputBuffer[0] = 0.0
+	}
+	
+	if speed > 300.0 {
+		outputBuffer[1] = 1.0 // brake
+	} else {
+		outputBuffer[1] = 0.0
+	}
+	
+	// Turn towards the center of the road
+	if x < roadCenterX-10.0 {
+		outputBuffer[2] = 0.0 // turnLeft
+		outputBuffer[3] = 1.0 // turnRight
+	} else if x > roadCenterX+10.0 {
+		outputBuffer[2] = 1.0 // turnLeft
+		outputBuffer[3] = 0.0 // turnRight
+	} else {
+		outputBuffer[2] = 0.0 // turnLeft
+		outputBuffer[3] = 0.0 // turnRight
+	}
+}
+
+//export cleanup
+func cleanup() {
+	// Nothing to clean up with this approach
+}
+
+// Required main function for Go WebAssembly
+func main() {}
+```
+
 ### Building Your AI
-To build your AI, you'll need to compile it to a standalone WebAssembly file. The sample AI includes a build script that uses Emscripten to compile the C code to WASM.
+To build your AI, you'll need to compile it to a standalone WebAssembly file. The sample AIs include build scripts for different languages.
+
+#### C Build Script
 
 ```bash
 #!/bin/bash
@@ -267,13 +399,42 @@ To build your AI, you'll need to compile it to a standalone WebAssembly file. Th
 emcc sample_ai.c \
     -o ../../../public/wasm/sample_ai.wasm \
     -s WASM=1 \
-    -s SIDE_MODULE=1 \
-    -s ALLOW_MEMORY_GROWTH=1 \
+    -s STANDALONE_WASM \
+    -s INITIAL_MEMORY=65536 \
+    -s TOTAL_STACK=16384 \
+    -s EXPORTED_FUNCTIONS=[] \
+    -s EXPORTED_RUNTIME_METHODS=[] \
     --no-entry \
-    -s ERROR_ON_UNDEFINED_SYMBOLS=0 \
-    -s ASSERTIONS=1 \
     -O3
 ```
+
+#### Rust Build Script
+
+```bash
+#!/bin/bash
+# Build the Rust project in release mode targeting WebAssembly
+cargo build --release --target wasm32-unknown-unknown
+
+# Copy the compiled WebAssembly file to the public directory
+cp target/wasm32-unknown-unknown/release/rust_sample.wasm ../../../public/wasm/
+```
+
+#### Future Language Support
+
+We plan to add support for more languages in the future, such as Go, AssemblyScript, and others. Stay tuned for updates!
+
+#### Note on Other Languages
+
+Any language that can compile to standalone WebAssembly should work with our system. The key requirements are:
+
+1. The WebAssembly module must export the following functions:
+   - `allocate_input`: Returns a pointer to memory for input data
+   - `allocate_output`: Returns a pointer to memory for output data
+   - `process`: Processes the input data and writes to the output buffer
+
+2. The memory layout must match our expected format:
+   - Input: 9 consecutive 64-bit floats (72 bytes)
+   - Output: 4 consecutive 64-bit floats (32 bytes)
 
 ### Alternative: JavaScript Submission
 If you prefer to write your AI in JavaScript or TypeScript, you can implement the `CarAI` interface directly. See the `SimpleAI.ts` file for an example.

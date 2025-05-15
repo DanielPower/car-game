@@ -52,26 +52,48 @@ export class Game {
       aiCar1.setAI(simpleAI);
       this.aiCars.push(aiCar1);
       
-      // Create the second AI car with WASM AI (positioned on the right)
-      // We'll try to load a WASM AI, but handle the case where the file doesn't exist yet
+      // Create the second AI car with C WASM AI (positioned on the right)
       try {
         const aiCar2 = new Car(
-          this.canvas.width / 2 + 150,
+          this.canvas.width / 2 + 120,
           this.canvas.height - 300,
           40,
           80,
           'green'
         );
         
-        // Load WASM AI using the dedicated function
-        const wasmAI = await loadWasmAI('/wasm/sample_ai.wasm');
-        aiCar2.setAI(wasmAI);
+        // Load C WASM AI using the dedicated function
+        const cWasmAI = await loadWasmAI('/wasm/sample_ai.wasm');
+        aiCar2.setAI(cWasmAI);
         this.aiCars.push(aiCar2);
-        console.log('WASM AI loaded successfully');
+        console.log('C WASM AI loaded successfully');
       } catch (error: unknown) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-        console.log('WASM AI not available yet:', errorMessage);
+        console.log('C WASM AI not available yet:', errorMessage);
       }
+      
+      // Create the third AI car with Rust WASM AI (positioned on the right)
+      try {
+        const aiCar3 = new Car(
+          this.canvas.width / 2 + 180,
+          this.canvas.height - 300,
+          40,
+          80,
+          'orange'
+        );
+        
+        // Load Rust WASM AI using the dedicated function
+        const rustWasmAI = await loadWasmAI('/wasm/rust_sample.wasm');
+        aiCar3.setAI(rustWasmAI);
+        this.aiCars.push(aiCar3);
+        console.log('Rust WASM AI loaded successfully');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log('Rust WASM AI not available yet:', errorMessage);
+      }
+      
+      // Note: We've removed the Go WASM AI implementation as it requires further work
+      // We're focusing on the C and Rust implementations for now
       
       console.log('Cars initialized successfully');
     } catch (error: unknown) {
