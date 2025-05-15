@@ -1,7 +1,6 @@
 import { Car } from './car';
 import { Road } from './road';
 import { PlayerAI } from './ai/PlayerAI';
-import { SimpleAI } from './ai/SimpleAI';
 import { loadWasmAI } from './ai/loadWasmAI';
 
 export class Game {
@@ -38,19 +37,25 @@ export class Game {
       const playerAI = new PlayerAI();
       this.playerCar.setAI(playerAI);
       
-      // Create the first AI car with SimpleAI (positioned on the left)
-      const aiCar1 = new Car(
-        this.canvas.width / 2 - 150,
-        this.canvas.height - 300,
-        40,
-        80,
-        'red'
-      );
-      
-      // Set up the SimpleAI directly
-      const simpleAI = new SimpleAI();
-      aiCar1.setAI(simpleAI);
-      this.aiCars.push(aiCar1);
+      // Create the first AI car with AssemblyScript WebAssembly AI (positioned on the left)
+      try {
+        const aiCar1 = new Car(
+          this.canvas.width / 2 - 150,
+          this.canvas.height - 300,
+          40,
+          80,
+          'red'
+        );
+        
+        // Load AssemblyScript WASM AI using the dedicated function
+        const assemblyScriptAI = await loadWasmAI('/wasm/simple_ai.wasm');
+        aiCar1.setAI(assemblyScriptAI);
+        this.aiCars.push(aiCar1);
+        console.log('AssemblyScript WASM AI loaded successfully');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log('AssemblyScript WASM AI not available yet:', errorMessage);
+      }
       
       // Create the second AI car with C WASM AI (positioned on the right)
       try {
@@ -63,7 +68,7 @@ export class Game {
         );
         
         // Load C WASM AI using the dedicated function
-        const cWasmAI = await loadWasmAI('/wasm/sample_ai.wasm');
+        const cWasmAI = await loadWasmAI('/wasm/c_sample.wasm');
         aiCar2.setAI(cWasmAI);
         this.aiCars.push(aiCar2);
         console.log('C WASM AI loaded successfully');

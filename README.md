@@ -71,8 +71,9 @@ See [COMPETITION.md](COMPETITION.md) for detailed instructions on creating and s
   - `ai/`: AI implementation framework
     - `CarAI.ts`: Interface for AI implementations
     - `WasmAI.ts`: WebAssembly AI adapter
-    - `SimpleAI.ts`: Sample JavaScript AI implementation
-    - `wasm-sample/`: Sample C implementation for WebAssembly
+    - `c-sample/`: Sample C implementation for WebAssembly
+    - `rust-sample/`: Sample Rust implementation for WebAssembly
+    - `assemblyscript-sample/`: Sample AssemblyScript implementation for WebAssembly
   - `car.ts`: Car physics and rendering
   - `road.ts`: Road environment
   - `game.ts`: Game logic

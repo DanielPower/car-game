@@ -63,7 +63,7 @@ typedef struct {
 
 ## Sample Implementation
 
-A sample C implementation is provided in `src/ai/wasm-sample/sample_ai.c`. You can use this as a starting point for your own AI.
+A sample C implementation is provided in `src/ai/c-sample/c_sample.c`. You can use this as a starting point for your own AI.
 
 ## Building Your AI
 
@@ -180,7 +180,7 @@ The input and output buffers use the following memory layout:
 
 We provide sample AI implementations in multiple languages to help you get started:
 
-#### C Sample (`src/ai/wasm-sample`)
+#### C Sample (`src/ai/c-sample`)
 
 A basic implementation in C that demonstrates the core concepts.
 
@@ -419,9 +419,68 @@ cargo build --release --target wasm32-unknown-unknown
 cp target/wasm32-unknown-unknown/release/rust_sample.wasm ../../../public/wasm/
 ```
 
+#### AssemblyScript Sample AI
+
+Here's an example of implementing the AI in AssemblyScript:
+
+```typescript
+// Static memory allocation
+let inputBuffer = new StaticArray<f64>(9);
+let outputBuffer = new StaticArray<f64>(4);
+
+// Return a pointer to the input buffer
+export function allocate_input(): usize {
+  return changetype<usize>(inputBuffer);
+}
+
+// Return a pointer to the output buffer
+export function allocate_output(): usize {
+  return changetype<usize>(outputBuffer);
+}
+
+// Process the input data and produce output
+export function process(): void {
+  // Simple AI logic: stay in the middle of the road and maintain speed
+  const roadCenter = inputBuffer[6] / 2; // roadWidth / 2
+  const carPositionX = inputBuffer[0]; // x position
+  
+  // Calculate if the car needs to turn to stay in the center
+  const distanceFromCenter = carPositionX - roadCenter;
+  const turnThreshold: f64 = 50; // How far from center before turning
+  
+  // Simple logic for controlling the car
+  const turnLeft = distanceFromCenter > turnThreshold ? 1.0 : 0.0;
+  const turnRight = distanceFromCenter < -turnThreshold ? 1.0 : 0.0;
+  const accelerate = inputBuffer[2] < 200.0 ? 1.0 : 0.0; // Maintain a moderate speed
+  const brake = inputBuffer[2] > 250.0 ? 1.0 : 0.0; // Brake if going too fast
+  
+  // Set output values
+  outputBuffer[0] = accelerate;
+  outputBuffer[1] = brake;
+  outputBuffer[2] = turnLeft;
+  outputBuffer[3] = turnRight;
+}
+
+// Cleanup function (not needed for this implementation)
+export function cleanup(): void {
+  // Nothing to clean up
+}
+```
+
+#### AssemblyScript Build Script
+
+```bash
+#!/bin/bash
+# Install AssemblyScript if needed
+npm install -g assemblyscript
+
+# Compile the AssemblyScript code to WebAssembly
+npx asc simple_ai.ts --target release -o ../../../public/wasm/simple_ai.wasm --use abort= --optimize
+```
+
 #### Future Language Support
 
-We plan to add support for more languages in the future, such as Go, AssemblyScript, and others. Stay tuned for updates!
+We plan to add support for more languages in the future, such as Go and others. Stay tuned for updates!
 
 #### Note on Other Languages
 
@@ -437,7 +496,7 @@ Any language that can compile to standalone WebAssembly should work with our sys
    - Output: 4 consecutive 64-bit floats (32 bytes)
 
 ### Alternative: JavaScript Submission
-If you prefer to write your AI in JavaScript or TypeScript, you can implement the `CarAI` interface directly. See the `SimpleAI.ts` file for an example.
+If you prefer to write your AI in JavaScript or TypeScript, you can implement the `CarAI` interface directly. We recommend using AssemblyScript (shown above) for the best performance, but direct JavaScript implementation is also possible.
 
 ## Setting Up Your Development Environment
 
