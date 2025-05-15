@@ -1,3 +1,5 @@
+import type { CarAI } from './ai/CarAI';
+
 export class Car {
   private x: number;
   private y: number;
@@ -11,18 +13,73 @@ export class Car {
   private friction: number = 50;
   private rotation: number = 0;
   private rotationSpeed: number = 3;
+  private ai: CarAI | null = null;
+  private color: string;
 
-  constructor(x: number, y: number, width: number, height: number) {
+  constructor(x: number, y: number, width: number, height: number, color: string = 'red') {
     this.x = x;
     this.y = y;
     this.width = width;
     this.height = height;
+    this.color = color;
+  }
+  
+  setAI(ai: CarAI): void {
+    this.ai = ai;
   }
 
   update(keys: Set<string>, deltaTime: number): void {
-    this.handleInput(keys, deltaTime);
+    if (this.ai) {
+      this.handleAI(deltaTime);
+    } else {
+      this.handleInput(keys, deltaTime);
+    }
+    
     this.applyPhysics(deltaTime);
     this.updatePosition(deltaTime);
+  }
+
+  private handleAI(deltaTime: number): void {
+    if (!this.ai) return;
+    
+    // Prepare input for AI
+    const input = {
+      x: this.x,
+      y: this.y,
+      speed: this.speed,
+      rotation: this.rotation,
+      width: this.width,
+      height: this.height,
+      roadWidth: 800, // Should come from road
+      roadHeight: 600, // Should come from road
+      deltaTime: deltaTime
+    };
+    
+    // Get AI decision
+    const output = this.ai.process(input);
+    
+    // Apply AI controls
+    if (output.accelerate) {
+      this.speed += this.acceleration * deltaTime;
+    }
+    
+    if (output.brake) {
+      if (this.speed > 0) {
+        this.speed -= this.brakeForce * deltaTime;
+      } else if (this.speed < 0) {
+        this.speed += this.brakeForce * deltaTime;
+      }
+    }
+    
+    if (Math.abs(this.speed) > 0.1) {
+      if (output.turnLeft) {
+        this.rotation -= this.rotationSpeed * deltaTime * Math.sign(this.speed);
+      }
+      
+      if (output.turnRight) {
+        this.rotation += this.rotationSpeed * deltaTime * Math.sign(this.speed);
+      }
+    }
   }
 
   private handleInput(keys: Set<string>, deltaTime: number): void {
@@ -78,7 +135,7 @@ export class Car {
     ctx.rotate(this.rotation);
     
     // Car body
-    ctx.fillStyle = 'red';
+    ctx.fillStyle = this.color;
     ctx.fillRect(-this.width / 2, -this.height / 2, this.width, this.height);
     
     // Car details (windows, lights, etc.)
