@@ -8,7 +8,6 @@ export class Car {
   private speed: number = 0;
   private maxSpeed: number = 300;
   private acceleration: number = 200;
-  private deceleration: number = 150;
   private brakeForce: number = 400;
   private friction: number = 50;
   private rotation: number = 0;
@@ -28,19 +27,11 @@ export class Car {
     this.ai = ai;
   }
 
-  update(keys: Set<string>, deltaTime: number): void {
-    if (this.ai) {
-      this.handleAI(deltaTime);
-    } else {
-      this.handleInput(keys, deltaTime);
+  update(deltaTime: number): void {
+    if (!this.ai) {
+      console.warn('Car has no AI controller assigned');
+      return;
     }
-    
-    this.applyPhysics(deltaTime);
-    this.updatePosition(deltaTime);
-  }
-
-  private handleAI(deltaTime: number): void {
-    if (!this.ai) return;
     
     // Prepare input for AI
     const input = {
@@ -80,34 +71,9 @@ export class Car {
         this.rotation += this.rotationSpeed * deltaTime * Math.sign(this.speed);
       }
     }
-  }
-
-  private handleInput(keys: Set<string>, deltaTime: number): void {
-    if (keys.has('ArrowUp')) {
-      this.speed += this.acceleration * deltaTime;
-    }
     
-    if (keys.has('ArrowDown')) {
-      this.speed -= this.deceleration * deltaTime;
-    }
-    
-    if (keys.has(' ')) { // Space bar for braking
-      if (this.speed > 0) {
-        this.speed -= this.brakeForce * deltaTime;
-      } else if (this.speed < 0) {
-        this.speed += this.brakeForce * deltaTime;
-      }
-    }
-    
-    if (Math.abs(this.speed) > 0.1) {
-      if (keys.has('ArrowLeft')) {
-        this.rotation -= this.rotationSpeed * deltaTime * Math.sign(this.speed);
-      }
-      
-      if (keys.has('ArrowRight')) {
-        this.rotation += this.rotationSpeed * deltaTime * Math.sign(this.speed);
-      }
-    }
+    this.applyPhysics(deltaTime);
+    this.updatePosition(deltaTime);
   }
 
   private applyPhysics(deltaTime: number): void {

@@ -1,79 +1,83 @@
-#include <stdlib.h>
-#include <math.h>
-#include <emscripten.h>
+// Simple AI implementation for the car game
+// This is designed to be compiled to WebAssembly
 
-// Structure to match our TypeScript CarAIInput
-typedef struct {
-    double x;
-    double y;
-    double speed;
-    double rotation;
-    double width;
-    double height;
-    double roadWidth;
-    double roadHeight;
-    double deltaTime;
-    // Additional fields can be added as needed
-} CarAIInput;
+// Input buffer - 9 doubles (72 bytes)
+// [0]: x position
+// [1]: y position
+// [2]: speed
+// [3]: rotation
+// [4]: width
+// [5]: height
+// [6]: roadWidth
+// [7]: roadHeight
+// [8]: deltaTime
 
-// Structure to match our TypeScript CarAIOutput
-typedef struct {
-    double accelerate;
-    double brake;
-    double turnLeft;
-    double turnRight;
-} CarAIOutput;
+// Output buffer - 4 doubles (32 bytes)
+// [0]: accelerate (non-zero = true)
+// [1]: brake (non-zero = true)
+// [2]: turnLeft (non-zero = true)
+// [3]: turnRight (non-zero = true)
 
-// Global pointers to our input and output structures
-static CarAIInput* input = NULL;
-static CarAIOutput* output = NULL;
+// Memory layout:
+// 0-71: Input buffer (9 doubles)
+// 72-103: Output buffer (4 doubles)
 
-// Function to allocate memory for input
-EMSCRIPTEN_KEEPALIVE
+// We'll use a static memory area for our buffers
+static double input_buffer[9];
+static double output_buffer[4];
+
+// Allocate memory for input - returns pointer to input buffer
+__attribute__((export_name("allocate_input")))
 double* allocate_input() {
-    if (input == NULL) {
-        input = (CarAIInput*)malloc(sizeof(CarAIInput));
-    }
-    return (double*)input;
+  return input_buffer;
 }
 
-// Function to allocate memory for output
-EMSCRIPTEN_KEEPALIVE
+// Allocate memory for output - returns pointer to output buffer
+__attribute__((export_name("allocate_output")))
 double* allocate_output() {
-    if (output == NULL) {
-        output = (CarAIOutput*)malloc(sizeof(CarAIOutput));
-    }
-    return (double*)output;
+  return output_buffer;
 }
 
-// Main processing function that will be called from TypeScript
-EMSCRIPTEN_KEEPALIVE
+// Process the input and produce output
+__attribute__((export_name("process")))
 void process() {
-    if (input == NULL || output == NULL) {
-        return;
-    }
-    
-    // Simple AI logic similar to SimpleAI.ts
-    double roadCenter = input->roadWidth / 2;
-    double distanceFromCenter = input->x - roadCenter;
-    double turnThreshold = 50.0;
-    
-    // Determine control signals
-    output->turnLeft = (distanceFromCenter > turnThreshold) ? 1.0 : 0.0;
-    output->turnRight = (distanceFromCenter < -turnThreshold) ? 1.0 : 0.0;
-    output->accelerate = (input->speed < 200.0) ? 1.0 : 0.0;
-    output->brake = (input->speed > 250.0) ? 1.0 : 0.0;
+  // Use our static buffers
+  double* input = input_buffer;
+  double* output = output_buffer;
+  
+  // Extract input values
+  double x = input[0];
+  double y = input[1];
+  double speed = input[2];
+  double rotation = input[3];
+  double width = input[4];
+  double height = input[5];
+  double roadWidth = input[6];
+  double roadHeight = input[7];
+  double deltaTime = input[8];
+  
+  // Simple AI logic: stay in the center of the road
+  double roadCenterX = roadWidth / 2;
+  
+  // Accelerate if going slow, brake if going too fast
+  output[0] = speed < 200 ? 1.0 : 0.0;  // accelerate
+  output[1] = speed > 300 ? 1.0 : 0.0;  // brake
+  
+  // Turn towards the center of the road
+  if (x < roadCenterX - 10) {
+    output[2] = 0.0;  // turnLeft
+    output[3] = 1.0;  // turnRight
+  } else if (x > roadCenterX + 10) {
+    output[2] = 1.0;  // turnLeft
+    output[3] = 0.0;  // turnRight
+  } else {
+    output[2] = 0.0;  // turnLeft
+    output[3] = 0.0;  // turnRight
+  }
 }
 
-// Clean up function
-EMSCRIPTEN_KEEPALIVE
+// Cleanup function (not really needed with this approach)
+__attribute__((export_name("cleanup")))
 void cleanup() {
-    if (input != NULL) {
-        free(input);
-        input = NULL;
-    }
-    if (output != NULL) {
-        free(output);
-        output = NULL;
-    }
+  // Nothing to clean up with this approach
 }

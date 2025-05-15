@@ -4,8 +4,8 @@ import type { WasmModule } from './WasmLoader';
 
 export class WasmAI implements CarAI {
   private wasmModule: WasmModule | null = null;
-  private inputBuffer: Float64Array | null = null;
-  private outputBuffer: Float64Array | null = null;
+  private inputPtr: number = 0;
+  private outputPtr: number = 0;
   private memory: WebAssembly.Memory | null = null;
 
   constructor(private wasmUrl: string) {}
@@ -14,31 +14,30 @@ export class WasmAI implements CarAI {
     try {
       this.wasmModule = await WasmLoader.loadWasm(this.wasmUrl);
       
-      // Get the memory from the WASM module
-      this.memory = (this.wasmModule.instance.exports.memory as WebAssembly.Memory) || 
-                   (this.wasmModule.instance.exports.__wasm_memory as WebAssembly.Memory);
-      
-      if (!this.memory) {
-        throw new Error('WASM module does not export memory');
-      }
-      
-      // Create views into the memory for input and output
-      const exports = this.wasmModule.instance.exports;
-      
       // Check if the required functions exist
+      const exports = this.wasmModule.instance.exports;
       if (typeof exports.allocate_input !== 'function' || 
           typeof exports.allocate_output !== 'function' || 
           typeof exports.process !== 'function') {
         throw new Error('WASM module does not export required functions');
       }
       
-      // Allocate memory for input and output
-      const inputPtr = (exports.allocate_input as Function)();
-      const outputPtr = (exports.allocate_output as Function)();
+      // Get memory from the module
+      this.memory = exports.memory as WebAssembly.Memory;
+      if (!this.memory) {
+        throw new Error('WASM module does not export memory');
+      }
       
-      // Create views into the memory
-      this.inputBuffer = new Float64Array(this.memory.buffer, inputPtr, 10); // Size depends on CarAIInput fields
-      this.outputBuffer = new Float64Array(this.memory.buffer, outputPtr, 4); // Size depends on CarAIOutput fields
+      // Allocate memory for input and output
+      this.inputPtr = (exports.allocate_input as CallableFunction)() as number;
+      this.outputPtr = (exports.allocate_output as CallableFunction)() as number;
+      
+      // Note: WebAssembly pointers can be 0, which is a valid address
+      // So we only check if they're undefined or null
+      if (this.inputPtr === undefined || this.inputPtr === null ||
+          this.outputPtr === undefined || this.outputPtr === null) {
+        throw new Error('Failed to allocate memory in WASM module');
+      }
       
       console.log('WASM AI initialized successfully');
     } catch (error) {
@@ -48,31 +47,47 @@ export class WasmAI implements CarAI {
   }
 
   process(input: CarAIInput): CarAIOutput {
-    if (!this.wasmModule || !this.inputBuffer || !this.outputBuffer) {
+    if (!this.wasmModule || !this.memory || !this.inputPtr || !this.outputPtr) {
       throw new Error('WASM AI not initialized');
     }
     
-    // Fill the input buffer with data from the input object
-    this.inputBuffer[0] = input.x;
-    this.inputBuffer[1] = input.y;
-    this.inputBuffer[2] = input.speed;
-    this.inputBuffer[3] = input.rotation;
-    this.inputBuffer[4] = input.width;
-    this.inputBuffer[5] = input.height;
-    this.inputBuffer[6] = input.roadWidth;
-    this.inputBuffer[7] = input.roadHeight;
-    this.inputBuffer[8] = input.deltaTime;
-    // Additional data can be added as needed
+    // Get memory as Float64Array
+    const f64Memory = new Float64Array(this.memory.buffer);
     
-    // Call the process function in the WASM module
-    (this.wasmModule.instance.exports.process as Function)();
+    // Write input values to memory
+    f64Memory[this.inputPtr/8 + 0] = input.x;
+    f64Memory[this.inputPtr/8 + 1] = input.y;
+    f64Memory[this.inputPtr/8 + 2] = input.speed;
+    f64Memory[this.inputPtr/8 + 3] = input.rotation;
+    f64Memory[this.inputPtr/8 + 4] = input.width;
+    f64Memory[this.inputPtr/8 + 5] = input.height;
+    f64Memory[this.inputPtr/8 + 6] = input.roadWidth;
+    f64Memory[this.inputPtr/8 + 7] = input.roadHeight;
+    f64Memory[this.inputPtr/8 + 8] = input.deltaTime;
     
-    // Read the output from the output buffer
+    // Call the process function
+    (this.wasmModule.instance.exports.process as CallableFunction)();
+    
+    // Read output values from memory
     return {
-      accelerate: this.outputBuffer[0] > 0,
-      brake: this.outputBuffer[1] > 0,
-      turnLeft: this.outputBuffer[2] > 0,
-      turnRight: this.outputBuffer[3] > 0
+      accelerate: f64Memory[this.outputPtr/8 + 0] > 0,
+      brake: f64Memory[this.outputPtr/8 + 1] > 0,
+      turnLeft: f64Memory[this.outputPtr/8 + 2] > 0,
+      turnRight: f64Memory[this.outputPtr/8 + 3] > 0
     };
+  }
+  
+  // Clean up resources when done
+  cleanup(): void {
+    if (this.wasmModule) {
+      try {
+        const cleanup = this.wasmModule.instance.exports.cleanup;
+        if (typeof cleanup === 'function') {
+          (cleanup as CallableFunction)();
+        }
+      } catch (error) {
+        console.error('Error during WASM cleanup:', error);
+      }
+    }
   }
 }

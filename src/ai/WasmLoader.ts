@@ -1,6 +1,18 @@
+// Interface for Emscripten-generated module
+export interface EmscriptenModule {
+  _allocate_input: () => number;
+  _allocate_output: () => number;
+  _process: () => void;
+  _cleanup: () => void;
+  _malloc: (size: number) => number;
+  _free: (ptr: number) => void;
+  HEAPF64: Float64Array;
+  asm: any;
+  memory: WebAssembly.Memory;
+}
+
 export interface WasmModule {
   instance: WebAssembly.Instance;
-  module: WebAssembly.Module;
 }
 
 export class WasmLoader {
@@ -13,25 +25,24 @@ export class WasmLoader {
     }
 
     try {
-      // Fetch the wasm file
+      // Fetch the WASM file
       const response = await fetch(url);
       if (!response.ok) {
         throw new Error(`Failed to fetch WASM module: ${response.statusText}`);
       }
-
-      // Compile and instantiate the module
-      const buffer = await response.arrayBuffer();
-      const module = await WebAssembly.compile(buffer);
-      const instance = await WebAssembly.instantiate(module, {
-        env: {
-          // Environment functions that can be called from WASM
-          // These will be available to the WASM module
-          memory: new WebAssembly.Memory({ initial: 256, maximum: 512 }),
-        }
-      });
-
-      // Cache the module
-      const wasmModule = { instance, module };
+      
+      // Get the binary data
+      const wasmBytes = await response.arrayBuffer();
+      
+      // Compile the module
+      const module = await WebAssembly.compile(wasmBytes);
+      
+      // Instantiate the module with empty imports
+      // This makes it language-agnostic - the WASM file must include everything it needs
+      const instance = await WebAssembly.instantiate(module, {});
+      
+      // Create and cache the module wrapper
+      const wasmModule: WasmModule = { instance };
       this.cache.set(url, wasmModule);
       
       return wasmModule;

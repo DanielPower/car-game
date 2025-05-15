@@ -1,15 +1,15 @@
 import { Car } from './car';
 import { Road } from './road';
-import { InputHandler } from './input';
-import { AIFactory, AIType } from './ai/AIFactory';
+import { PlayerAI } from './ai/PlayerAI';
+import { SimpleAI } from './ai/SimpleAI';
+import { loadWasmAI } from './ai/loadWasmAI';
 
 export class Game {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
-  private playerCar: Car;
+  private playerCar: Car | null = null;
   private aiCars: Car[] = [];
   private road: Road;
-  private inputHandler: InputHandler;
   private lastTime: number = 0;
   private running: boolean = false;
 
@@ -19,58 +19,64 @@ export class Game {
     
     this.road = new Road(this.canvas.width, this.canvas.height);
     
-    // Create player car
-    this.playerCar = new Car(
-      this.canvas.width / 2, 
-      this.canvas.height - 100, 
-      40, 
-      80,
-      'blue'
-    );
-    
-    this.inputHandler = new InputHandler();
-    
-    // Initialize AI cars
-    this.initializeAICars();
+    // Initialize cars with AI controllers
+    this.initializeCars();
   }
   
-  private async initializeAICars() {
+  private async initializeCars() {
     try {
-      // Create an AI car with SimpleAI
+      // Create player car with PlayerAI
+      this.playerCar = new Car(
+        this.canvas.width / 2, 
+        this.canvas.height - 100, 
+        40, 
+        80,
+        'blue'
+      );
+      
+      // Set up the PlayerAI controller directly
+      const playerAI = new PlayerAI();
+      this.playerCar.setAI(playerAI);
+      
+      // Create the first AI car with SimpleAI (positioned on the left)
       const aiCar1 = new Car(
-        this.canvas.width / 2 - 100,
+        this.canvas.width / 2 - 150,
         this.canvas.height - 300,
         40,
         80,
         'red'
       );
       
-      // Set up the SimpleAI
-      const simpleAI = await AIFactory.createAI(AIType.SIMPLE);
+      // Set up the SimpleAI directly
+      const simpleAI = new SimpleAI();
       aiCar1.setAI(simpleAI);
       this.aiCars.push(aiCar1);
       
-      // In a real competition, you would load WASM AI here
-      // Example (commented out as we don't have the WASM file yet):
-      /*
-      const aiCar2 = new Car(
-        this.canvas.width / 2 + 100,
-        this.canvas.height - 300,
-        40,
-        80,
-        'green'
-      );
+      // Create the second AI car with WASM AI (positioned on the right)
+      // We'll try to load a WASM AI, but handle the case where the file doesn't exist yet
+      try {
+        const aiCar2 = new Car(
+          this.canvas.width / 2 + 150,
+          this.canvas.height - 300,
+          40,
+          80,
+          'green'
+        );
+        
+        // Load WASM AI using the dedicated function
+        const wasmAI = await loadWasmAI('/wasm/sample_ai.wasm');
+        aiCar2.setAI(wasmAI);
+        this.aiCars.push(aiCar2);
+        console.log('WASM AI loaded successfully');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log('WASM AI not available yet:', errorMessage);
+      }
       
-      const wasmAI = await AIFactory.createAI(AIType.WASM, { 
-        wasmUrl: '/wasm/sample_ai.wasm' 
-      });
-      aiCar2.setAI(wasmAI);
-      this.aiCars.push(aiCar2);
-      */
-      
-      console.log('AI cars initialized successfully');
-    } catch (error) {
-      console.error('Failed to initialize AI cars:', error);
+      console.log('Cars initialized successfully');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Failed to initialize cars:', errorMessage);
     }
   }
 
@@ -93,11 +99,13 @@ export class Game {
 
   private update(deltaTime: number): void {
     // Update player car
-    this.playerCar.update(this.inputHandler.keys, deltaTime);
+    if (this.playerCar) {
+      this.playerCar.update(deltaTime);
+    }
     
     // Update AI cars
     for (const aiCar of this.aiCars) {
-      aiCar.update(new Set(), deltaTime); // Empty keys set as AI controls the car
+      aiCar.update(deltaTime);
     }
   }
 
@@ -107,7 +115,9 @@ export class Game {
     this.road.draw(this.ctx);
     
     // Draw player car
-    this.playerCar.draw(this.ctx);
+    if (this.playerCar) {
+      this.playerCar.draw(this.ctx);
+    }
     
     // Draw AI cars
     for (const aiCar of this.aiCars) {

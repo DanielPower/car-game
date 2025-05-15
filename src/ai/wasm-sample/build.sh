@@ -1,8 +1,8 @@
 #!/bin/bash
 
-# Check if emcc is available
+# Check if emcc (Emscripten compiler) is available
 if ! command -v emcc &> /dev/null; then
-    echo "Error: Emscripten compiler (emcc) not found."
+    echo "Error: emcc (Emscripten) is not installed or not in PATH"
     echo "Please install Emscripten: https://emscripten.org/docs/getting_started/downloads.html"
     exit 1
 fi
@@ -10,15 +10,17 @@ fi
 # Create output directory
 mkdir -p ../../../public/wasm
 
-# Compile the C code to WebAssembly
+# Compile the C code to a standalone WebAssembly file
+# Using minimal flags for maximum compatibility
 emcc sample_ai.c \
     -o ../../../public/wasm/sample_ai.wasm \
     -s WASM=1 \
-    -s EXPORTED_FUNCTIONS="['_allocate_input', '_allocate_output', '_process', '_cleanup', '_malloc', '_free']" \
-    -s EXPORTED_RUNTIME_METHODS="['ccall', 'cwrap']" \
-    -s ALLOW_MEMORY_GROWTH=1 \
-    -s MODULARIZE=1 \
-    -s EXPORT_NAME="SampleAI" \
+    -s STANDALONE_WASM \
+    -s INITIAL_MEMORY=65536 \
+    -s TOTAL_STACK=16384 \
+    -s EXPORTED_FUNCTIONS=[] \
+    -s EXPORTED_RUNTIME_METHODS=[] \
+    --no-entry \
     -O3
 
-echo "Compilation complete. WebAssembly module saved to public/wasm/sample_ai.wasm"
+echo "Compilation complete. Standalone WebAssembly module saved to public/wasm/sample_ai.wasm"
