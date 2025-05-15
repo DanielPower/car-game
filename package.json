@@ -1,0 +1,22 @@
+{
+  "name": "car-game",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "start": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "@vitejs/plugin-react": "^4.4.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  }
+}
