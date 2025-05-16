@@ -4,10 +4,10 @@ interface Vector2D {
 }
 
 export class Wall {
-  private x: number;
-  private y: number;
-  private width: number;
-  private height: number;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
   private color: string;
 
   constructor(x: number, y: number, width: number, height: number, color: string = '#333') {

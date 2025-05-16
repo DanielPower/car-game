@@ -1,7 +1,7 @@
-import { Game } from './game';
+import { PhysicsGame } from './physics/PhysicsGame';
 
-// Initialize the game when the window loads
+// Initialize the physics-based game when the window loads
 window.addEventListener('load', () => {
-  const game = new Game();
+  const game = new PhysicsGame();
   game.start();
 });

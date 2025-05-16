@@ -267,8 +267,35 @@ export class Car {
     
     this.lastCollisionTime = currentTime;
     
-    // Get wall normal based on car's position
-    const normal = wall.getNormal(this.x, this.y);
+    // Get car corners to find the collision point
+    const corners = this.getCorners();
+    
+    // Find which corner is closest to or inside the wall
+    let closestCorner = { x: this.x, y: this.y };
+    let minDistance = Number.MAX_VALUE;
+    
+    // Check each corner
+    for (const corner of corners) {
+      // If the corner is inside the wall, use it as the collision point
+      if (wall.containsPoint(corner.x, corner.y)) {
+        closestCorner = corner;
+        break;
+      }
+      
+      // Otherwise, find the closest corner to the wall
+      const distToWall = this.pointToWallDistance(corner, wall);
+      if (distToWall < minDistance) {
+        minDistance = distToWall;
+        closestCorner = corner;
+      }
+    }
+    
+    // Get wall normal based on the collision point, not just the car's center
+    const normal = wall.getNormal(closestCorner.x, closestCorner.y);
+    
+    // Calculate the vector from car center to impact point
+    const impactVectorX = closestCorner.x - this.x;
+    const impactVectorY = closestCorner.y - this.y;
     
     // Calculate reflection vector
     const dotProduct = this.velocity.x * normal.x + this.velocity.y * normal.y;
@@ -281,9 +308,28 @@ export class Car {
     this.velocity.x *= this.collisionDamping;
     this.velocity.y *= this.collisionDamping;
     
-    // Add some angular velocity based on collision angle
-    const impactAngle = Math.atan2(normal.y, normal.x) - this.rotation;
-    this.angularVelocity += Math.sin(impactAngle) * 2;
+    // Calculate torque based on impact point and normal
+    // Cross product of impact vector and normal gives proper rotation direction
+    const torque = impactVectorX * normal.y - impactVectorY * normal.x;
+    
+    // Scale torque by velocity magnitude for more realistic effect
+    const velMag = Math.sqrt(this.velocity.x * this.velocity.x + this.velocity.y * this.velocity.y);
+    const torqueScale = Math.min(velMag * 0.05, 2.0); // Limit maximum torque
+    
+    // Apply angular impulse
+    this.angularVelocity += torque * torqueScale;
+    
+    // Limit angular velocity to prevent excessive spinning
+    const maxAngVel = 8.0;
+    this.angularVelocity = Math.max(-maxAngVel, Math.min(maxAngVel, this.angularVelocity));
+  }
+  
+  // Helper method to calculate distance from a point to a wall
+  private pointToWallDistance(point: Vector2D, wall: Wall): number {
+    // Simple approximation - distance to closest edge
+    const dx = Math.max(wall.x - point.x, 0, point.x - (wall.x + wall.width));
+    const dy = Math.max(wall.y - point.y, 0, point.y - (wall.y + wall.height));
+    return Math.sqrt(dx * dx + dy * dy);
   }
   
   private getCorners(): Vector2D[] {

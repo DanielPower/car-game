@@ -18,5 +18,9 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
+  },
+  "dependencies": {
+    "@types/matter-js": "^0.19.8",
+    "matter-js": "^0.20.0"
   }
 }
