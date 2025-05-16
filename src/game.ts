@@ -1,6 +1,5 @@
 import { Car } from './car';
 import { Road } from './road';
-import { Wall } from './wall';
 import { PlayerAI } from './ai/PlayerAI';
 import { loadWasmAI } from './ai/loadWasmAI';
 
@@ -99,8 +98,25 @@ export class Game {
         console.log('Rust WASM AI not available yet:', errorMessage);
       }
       
-      // Note: We've removed the Go WASM AI implementation as it requires further work
-      // We're focusing on the C and Rust implementations for now
+      // Create the fourth AI car with Go WASM AI
+      try {
+        const aiCar4 = new Car(
+          this.canvas.width / 2 - 180,
+          this.canvas.height - 300,
+          40,
+          80,
+          'purple'
+        );
+        
+        // Load Go WASM AI using the dedicated function
+        const goWasmAI = await loadWasmAI('/wasm/go_sample.wasm');
+        aiCar4.setAI(goWasmAI);
+        this.aiCars.push(aiCar4);
+        console.log('Go WASM AI loaded successfully');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log('Go WASM AI not available yet:', errorMessage);
+      }
       
       console.log('Cars initialized successfully');
     } catch (error: unknown) {
