@@ -75,8 +75,8 @@ export class PhysicsCar {
         this.wheelSize,
         {
           collisionFilter: { group: -1 },
-          friction: 1.2,
-          frictionAir: 0.02,
+          friction: 2.5,
+          frictionAir: 0.01,
           density: 0.0015,
           restitution: 0.05,
           render: { fillStyle: '#333333' }
@@ -88,8 +88,8 @@ export class PhysicsCar {
         this.wheelSize,
         {
           collisionFilter: { group: -1 },
-          friction: 1.2,
-          frictionAir: 0.02,
+          friction: 2.5,
+          frictionAir: 0.01,
           density: 0.0015,
           restitution: 0.05,
           render: { fillStyle: '#333333' }
@@ -103,10 +103,10 @@ export class PhysicsCar {
         this.wheelSize,
         {
           collisionFilter: { group: -1 },
-          friction: 0.9,
-          frictionAir: 0.03,
-          density: 0.001,
-          restitution: 0.1,
+          friction: 2.0,
+          frictionAir: 0.01,
+          density: 0.0015,
+          restitution: 0.05,
           render: { fillStyle: '#333333' }
         }
       ),
@@ -116,10 +116,10 @@ export class PhysicsCar {
         this.wheelSize,
         {
           collisionFilter: { group: -1 },
-          friction: 0.9,
-          frictionAir: 0.03,
-          density: 0.001,
-          restitution: 0.1,
+          friction: 2.0,
+          frictionAir: 0.01,
+          density: 0.0015,
+          restitution: 0.05,
           render: { fillStyle: '#333333' }
         }
       )
@@ -233,8 +233,13 @@ export class PhysicsCar {
     // Calculate current speed
     const currentSpeed = this.getSpeed();
     
-    // Apply drive force to rear wheels
-    if (controls.accelerate) {
+    // Calculate the car's current direction of travel
+    const velocity = this.carBody.velocity;
+    const dotProduct = forwardX * velocity.x + forwardY * velocity.y;
+    const isMovingForward = dotProduct > 0;
+    
+    // Apply drive force to rear wheels (only when not braking)
+    if (controls.accelerate && !controls.brake) {
       // Apply less force at higher speeds
       const speedFactor = Math.max(0.3, 1 - (currentSpeed / this.maxSpeed));
       const forceMagnitude = this.enginePower * speedFactor;
@@ -246,20 +251,42 @@ export class PhysicsCar {
     
     // Apply reverse force or braking
     if (controls.brake) {
-      if (currentSpeed < 0.5) {
-        // Apply reverse force to rear wheels
+      // If nearly stopped or moving very slowly, apply reverse force
+      if (currentSpeed < 0.3) {
         const reverseForceMagnitude = this.reverseEnginePower;
         this.applyForceToWheel(this.wheels.rearLeft, -forwardX, -forwardY, reverseForceMagnitude);
         this.applyForceToWheel(this.wheels.rearRight, -forwardX, -forwardY, reverseForceMagnitude);
-      } else {
-        // Apply braking force to all wheels
-        const brakeForceMagnitude = this.brakePower;
+      } 
+      // If moving forward at moderate speed, apply braking
+      else if (isMovingForward) {
+        // Calculate braking force based on current speed
+        // More gentle braking at higher speeds to prevent shaking
+        const brakeFactor = Math.min(1, 0.7 + (currentSpeed / this.maxSpeed) * 0.3);
+        const brakeForceMagnitude = this.brakePower * brakeFactor;
         
-        // Get velocity direction for each wheel
-        this.applyBrakingForce(this.wheels.frontLeft, brakeForceMagnitude);
-        this.applyBrakingForce(this.wheels.frontRight, brakeForceMagnitude);
-        this.applyBrakingForce(this.wheels.rearLeft, brakeForceMagnitude);
-        this.applyBrakingForce(this.wheels.rearRight, brakeForceMagnitude);
+        // Apply braking as a velocity reduction rather than a force
+        // This creates smoother deceleration without shaking
+        const brakeRatio = Math.max(0, 1 - (brakeForceMagnitude * deltaTime * 10));
+        
+        // Apply to car body and all wheels
+        Matter.Body.setVelocity(this.carBody, {
+          x: velocity.x * brakeRatio,
+          y: velocity.y * brakeRatio
+        });
+        
+        // Apply to all wheels
+        Object.values(this.wheels).forEach(wheel => {
+          Matter.Body.setVelocity(wheel, {
+            x: wheel.velocity.x * brakeRatio,
+            y: wheel.velocity.y * brakeRatio
+          });
+        });
+      }
+      // If moving backward, apply forward force to slow down
+      else if (!isMovingForward && currentSpeed > 0.3) {
+        const brakeForceMagnitude = this.brakePower * 0.8;
+        this.applyForceToWheel(this.wheels.rearLeft, forwardX, forwardY, brakeForceMagnitude);
+        this.applyForceToWheel(this.wheels.rearRight, forwardX, forwardY, brakeForceMagnitude);
       }
     }
     
@@ -322,7 +349,7 @@ export class PhysicsCar {
         
         // Calculate how much torque to apply based on speed and steering angle
         // Slower speeds allow for sharper turns
-        const torqueFactor = 0.0002 * Math.min(1, 3 / speed);
+        const torqueFactor = 0.0004 * Math.min(1, 3 / speed); // Doubled for more responsive steering
         const torque = this.currentSteeringAngle * torqueFactor * speed;
         
         // Apply torque to the car body to make it rotate
@@ -333,7 +360,7 @@ export class PhysicsCar {
         
         // Calculate how much the front wheels resist sideways motion
         // This creates the effect of the wheels gripping the road
-        const wheelGrip = 0.2;
+        const wheelGrip = 0.5; // Increased from 0.2 for much better traction
         
         // Calculate the car's current velocity
         const velocity = this.carBody.velocity;
@@ -376,20 +403,8 @@ export class PhysicsCar {
     });
   }
   
-  private applyBrakingForce(wheel: Matter.Body, magnitude: number): void {
-    const velocity = wheel.velocity;
-    const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
-    
-    if (speed > 0.1) {
-      const normalizedVelocityX = -velocity.x / speed;
-      const normalizedVelocityY = -velocity.y / speed;
-      
-      Matter.Body.applyForce(wheel, wheel.position, {
-        x: normalizedVelocityX * magnitude,
-        y: normalizedVelocityY * magnitude
-      });
-    }
-  }
+  // Note: The old applyBrakingForce method has been removed as it's no longer used.
+  // Braking is now handled directly in the applyControls method using velocity reduction.
 
   getSpeed(): number {
     return Math.sqrt(

@@ -127,6 +127,27 @@ export class PhysicsGame {
         console.log('Rust WASM AI not available yet:', errorMessage);
       }
       
+      // Create the fourth AI car with Go WASM AI (positioned on the left)
+      try {
+        const aiCar4 = new PhysicsCar(
+          this.world,
+          this.canvas.width / 2 - 180,
+          this.canvas.height - 300,
+          40,
+          80,
+          'purple'
+        );
+        
+        // Load Go WASM AI
+        const goWasmAI = await loadWasmAI('/wasm/go_sample.wasm');
+        aiCar4.setAI(goWasmAI);
+        this.aiCars.push(aiCar4);
+        console.log('Go WASM AI loaded successfully');
+      } catch (error: unknown) {
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+        console.log('Go WASM AI not available yet:', errorMessage);
+      }
+      
       console.log('Cars initialized successfully');
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
