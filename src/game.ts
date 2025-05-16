@@ -1,5 +1,6 @@
 import { Car } from './car';
 import { Road } from './road';
+import { Wall } from './wall';
 import { PlayerAI } from './ai/PlayerAI';
 import { loadWasmAI } from './ai/loadWasmAI';
 
@@ -16,7 +17,8 @@ export class Game {
     this.canvas = document.getElementById('gameCanvas') as HTMLCanvasElement;
     this.ctx = this.canvas.getContext('2d') as CanvasRenderingContext2D;
     
-    this.road = new Road(this.canvas.width, this.canvas.height);
+    // Create a circuit track by default
+    this.road = new Road(this.canvas.width, this.canvas.height, 'circuit');
     
     // Initialize cars with AI controllers
     this.initializeCars();
@@ -125,14 +127,16 @@ export class Game {
   }
 
   private update(deltaTime: number): void {
+    const walls = this.road.getWalls();
+    
     // Update player car
     if (this.playerCar) {
-      this.playerCar.update(deltaTime);
+      this.playerCar.update(deltaTime, walls);
     }
     
     // Update AI cars
     for (const aiCar of this.aiCars) {
-      aiCar.update(deltaTime);
+      aiCar.update(deltaTime, walls);
     }
   }
 
