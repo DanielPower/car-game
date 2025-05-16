@@ -2,20 +2,38 @@ import * as Matter from 'matter-js';
 import type { CarAI, CarAIInput, CarAIOutput } from '../ai/CarAI';
 
 export class PhysicsCar {
-  // Matter.js objects
-  private body: Matter.Body;
+  // Car parts
+  private carBody: Matter.Body;
+  private wheels: {
+    frontLeft: Matter.Body;
+    frontRight: Matter.Body;
+    rearLeft: Matter.Body;
+    rearRight: Matter.Body;
+  };
+  private constraints: {
+    frontLeft: Matter.Constraint;
+    frontRight: Matter.Constraint;
+    rearLeft: Matter.Constraint;
+    rearRight: Matter.Constraint;
+  };
+  private composite: Matter.Composite;
   
-  // Car properties
+  // Car dimensions
   private width: number;
   private height: number;
+  private wheelBase: number; // Distance between front and rear wheels
+  private trackWidth: number; // Distance between left and right wheels
+  private wheelSize: number;
   private color: string;
-  private maxSpeed: number = 2.0; // Further reduced max speed
-  private enginePower: number = 0.008; // Further reduced engine power
-  private reverseEnginePower: number = 0.006; // Power for reversing (slightly less than forward)
-  private brakePower: number = 0.02; // Reduced brake power
-  private frictionAir: number = 0.12; // Significantly increased air friction
-  private angularFriction: number = 0.15; // Increased angular friction
-  private steeringPower: number = 0.01; // Further reduced steering power
+  
+  // Physics properties
+  private maxSpeed: number = 3.0;
+  private enginePower: number = 0.0015;
+  private reverseEnginePower: number = 0.001;
+  private brakePower: number = 0.02;
+  private steeringAngle: number = 0.5; // Max steering angle in radians (about 28 degrees)
+  private currentSteeringAngle: number = 0;
+  private steeringSpeed: number = 0.05; // How quickly steering angle changes
   
   // AI controller
   private ai: CarAI | null = null;
@@ -24,18 +42,150 @@ export class PhysicsCar {
     this.width = width;
     this.height = height;
     this.color = color;
-
-    // Create a rectangular body for the car
-    this.body = Matter.Bodies.rectangle(x, y, width, height, {
-      frictionAir: this.frictionAir,
-      friction: 0.04, // Increased ground friction
-      restitution: 0.1, // Reduced bounciness
-      density: 0.0025, // Slightly increased density for more weight
-      chamfer: { radius: 5 }, // Slightly rounded corners
+    
+    // Calculate wheel dimensions based on car size
+    this.wheelBase = height * 0.6;
+    this.trackWidth = width * 0.8;
+    this.wheelSize = width * 0.15;
+    
+    // Create composite to hold all car parts
+    this.composite = Matter.Composite.create({ label: 'car' });
+    
+    // Create car body (chassis) - low friction since it doesn't touch the ground
+    this.carBody = Matter.Bodies.rectangle(x, y, width, height, {
+      collisionFilter: { group: -1 }, // Negative group means it won't collide with other bodies in the same group
+      frictionAir: 0.01,
+      friction: 0.0001, // Very low friction since it doesn't touch the ground
+      restitution: 0.2,
+      density: 0.002,
+      chamfer: { radius: 10 },
+      render: { fillStyle: color }
     });
-
-    // Add the body to the world
-    Matter.Composite.add(world, this.body);
+    
+    // Calculate wheel positions
+    const halfTrackWidth = this.trackWidth / 2;
+    const halfWheelBase = this.wheelBase / 2;
+    
+    // Create wheels with high friction
+    this.wheels = {
+      // Front wheels
+      frontLeft: Matter.Bodies.circle(
+        x - halfTrackWidth,
+        y - halfWheelBase,
+        this.wheelSize,
+        {
+          collisionFilter: { group: -1 },
+          friction: 1.2,
+          frictionAir: 0.02,
+          density: 0.0015,
+          restitution: 0.05,
+          render: { fillStyle: '#333333' }
+        }
+      ),
+      frontRight: Matter.Bodies.circle(
+        x + halfTrackWidth,
+        y - halfWheelBase,
+        this.wheelSize,
+        {
+          collisionFilter: { group: -1 },
+          friction: 1.2,
+          frictionAir: 0.02,
+          density: 0.0015,
+          restitution: 0.05,
+          render: { fillStyle: '#333333' }
+        }
+      ),
+      
+      // Rear wheels (drive wheels)
+      rearLeft: Matter.Bodies.circle(
+        x - halfTrackWidth,
+        y + halfWheelBase,
+        this.wheelSize,
+        {
+          collisionFilter: { group: -1 },
+          friction: 0.9,
+          frictionAir: 0.03,
+          density: 0.001,
+          restitution: 0.1,
+          render: { fillStyle: '#333333' }
+        }
+      ),
+      rearRight: Matter.Bodies.circle(
+        x + halfTrackWidth,
+        y + halfWheelBase,
+        this.wheelSize,
+        {
+          collisionFilter: { group: -1 },
+          friction: 0.9,
+          frictionAir: 0.03,
+          density: 0.001,
+          restitution: 0.1,
+          render: { fillStyle: '#333333' }
+        }
+      )
+    };
+    
+    // Create constraints to attach wheels to the car body
+    const stiffness = 0.2;
+    const damping = 0.5;
+    
+    this.constraints = {
+      frontLeft: Matter.Constraint.create({
+        bodyA: this.carBody,
+        bodyB: this.wheels.frontLeft,
+        pointA: { x: -halfTrackWidth, y: -halfWheelBase },
+        pointB: { x: 0, y: 0 },
+        stiffness: stiffness,
+        damping: damping,
+        length: 0
+      }),
+      frontRight: Matter.Constraint.create({
+        bodyA: this.carBody,
+        bodyB: this.wheels.frontRight,
+        pointA: { x: halfTrackWidth, y: -halfWheelBase },
+        pointB: { x: 0, y: 0 },
+        stiffness: stiffness,
+        damping: damping,
+        length: 0
+      }),
+      rearLeft: Matter.Constraint.create({
+        bodyA: this.carBody,
+        bodyB: this.wheels.rearLeft,
+        pointA: { x: -halfTrackWidth, y: halfWheelBase },
+        pointB: { x: 0, y: 0 },
+        stiffness: stiffness,
+        damping: damping,
+        length: 0
+      }),
+      rearRight: Matter.Constraint.create({
+        bodyA: this.carBody,
+        bodyB: this.wheels.rearRight,
+        pointA: { x: halfTrackWidth, y: halfWheelBase },
+        pointB: { x: 0, y: 0 },
+        stiffness: stiffness,
+        damping: damping,
+        length: 0
+      })
+    };
+    
+    // Add all parts to the composite
+    Matter.Composite.add(this.composite, [
+      this.carBody,
+      this.wheels.frontLeft,
+      this.wheels.frontRight,
+      this.wheels.rearLeft,
+      this.wheels.rearRight,
+      this.constraints.frontLeft,
+      this.constraints.frontRight,
+      this.constraints.rearLeft,
+      this.constraints.rearRight
+    ]);
+    
+    // Add the composite to the world
+    Matter.Composite.add(world, this.composite);
+    
+    // Set initial angle
+    Matter.Body.setAngle(this.carBody, Math.PI * 1.5); // Point upward initially
   }
 
   setAI(ai: CarAI): void {
@@ -50,10 +200,10 @@ export class PhysicsCar {
 
     // Prepare input for AI
     const input: CarAIInput = {
-      x: this.body.position.x,
-      y: this.body.position.y,
+      x: this.carBody.position.x,
+      y: this.carBody.position.y,
       speed: this.getSpeed(),
-      rotation: this.body.angle,
+      rotation: this.carBody.angle,
       width: this.width,
       height: this.height,
       roadWidth: 800, // Should come from road
@@ -65,117 +215,211 @@ export class PhysicsCar {
     const output = this.ai.process(input);
 
     // Apply forces based on AI output
-    this.applyControls(output);
+    this.applyControls(output, deltaTime);
+    
+    // Update wheel positions and angles based on steering
+    this.updateWheels();
   }
 
-  private applyControls(controls: CarAIOutput): void {
-    // Get the forward direction vector based on car's angle
-    const forwardX = Math.sin(this.body.angle);
-    const forwardY = -Math.cos(this.body.angle);
-
-    // Calculate current velocity in car's local frame
-    const velocity = this.body.velocity;
+  private applyControls(controls: CarAIOutput, deltaTime: number): void {
+    // Update steering angle based on input
+    this.updateSteering(controls, deltaTime);
+    
+    // Get the forward direction vector of the car body
+    const carAngle = this.carBody.angle;
+    const forwardX = Math.sin(carAngle);
+    const forwardY = -Math.cos(carAngle);
+    
+    // Calculate current speed
     const currentSpeed = this.getSpeed();
     
-    // Calculate dot product to determine if car is moving forward or backward
-    const dotProduct = forwardX * velocity.x + forwardY * velocity.y;
-    const isMovingForward = dotProduct > 0;
-
-    // Apply acceleration force
+    // Apply drive force to rear wheels
     if (controls.accelerate) {
-      // Apply less force at higher speeds for more control
-      const speedFactor = Math.max(0.4, 1 - (currentSpeed / this.maxSpeed));
-      const forceMagnitude = this.enginePower * this.body.mass * speedFactor;
+      // Apply less force at higher speeds
+      const speedFactor = Math.max(0.3, 1 - (currentSpeed / this.maxSpeed));
+      const forceMagnitude = this.enginePower * speedFactor;
       
-      Matter.Body.applyForce(
-        this.body,
-        this.body.position,
-        { x: forwardX * forceMagnitude, y: forwardY * forceMagnitude }
-      );
+      // Apply force to both rear wheels
+      this.applyForceToWheel(this.wheels.rearLeft, forwardX, forwardY, forceMagnitude);
+      this.applyForceToWheel(this.wheels.rearRight, forwardX, forwardY, forceMagnitude);
     }
-
-    // Apply reverse force or braking force
+    
+    // Apply reverse force or braking
     if (controls.brake) {
-      if (currentSpeed < 0.2) {
-        // If nearly stopped, apply reverse force
-        const reverseForceMagnitude = this.reverseEnginePower * this.body.mass;
-        Matter.Body.applyForce(
-          this.body,
-          this.body.position,
-          { 
-            x: -forwardX * reverseForceMagnitude, 
-            y: -forwardY * reverseForceMagnitude 
-          }
-        );
+      if (currentSpeed < 0.5) {
+        // Apply reverse force to rear wheels
+        const reverseForceMagnitude = this.reverseEnginePower;
+        this.applyForceToWheel(this.wheels.rearLeft, -forwardX, -forwardY, reverseForceMagnitude);
+        this.applyForceToWheel(this.wheels.rearRight, -forwardX, -forwardY, reverseForceMagnitude);
       } else {
-        // If moving, apply braking force in the opposite direction of current velocity
-        const brakeForceMagnitude = this.brakePower * this.body.mass;
-
-        // Only apply braking if speed is significant
-        if (currentSpeed > 0.1) {
-          const normalizedVelocityX = velocity.x / currentSpeed;
-          const normalizedVelocityY = velocity.y / currentSpeed;
-
-          Matter.Body.applyForce(
-            this.body,
-            this.body.position,
-            { 
-              x: -normalizedVelocityX * brakeForceMagnitude, 
-              y: -normalizedVelocityY * brakeForceMagnitude 
-            }
-          );
-        }
+        // Apply braking force to all wheels
+        const brakeForceMagnitude = this.brakePower;
+        
+        // Get velocity direction for each wheel
+        this.applyBrakingForce(this.wheels.frontLeft, brakeForceMagnitude);
+        this.applyBrakingForce(this.wheels.frontRight, brakeForceMagnitude);
+        this.applyBrakingForce(this.wheels.rearLeft, brakeForceMagnitude);
+        this.applyBrakingForce(this.wheels.rearRight, brakeForceMagnitude);
       }
     }
-
-    // Apply steering torque
-    let steeringInput = 0;
-    if (controls.turnLeft) steeringInput -= 1;
-    if (controls.turnRight) steeringInput += 1;
-
-    // Steering effectiveness is proportional to speed but with a minimum value
-    const steeringEffectiveness = Math.min(1, Math.max(0.3, currentSpeed / 2));
     
-    // Reduce steering power at very high speeds
-    const highSpeedFactor = currentSpeed > this.maxSpeed * 0.8 ? 0.7 : 1.0;
-    
-    // Apply torque for steering
-    const torque = steeringInput * this.steeringPower * steeringEffectiveness * highSpeedFactor;
-    Matter.Body.setAngularVelocity(this.body, this.body.angularVelocity + torque);
-
-    // Apply angular friction (more when not steering)
-    const angularDamping = steeringInput === 0 ? this.angularFriction * 1.2 : this.angularFriction;
-    Matter.Body.setAngularVelocity(
-      this.body, 
-      this.body.angularVelocity * (1 - angularDamping)
-    );
-
     // Limit maximum speed
     if (currentSpeed > this.maxSpeed) {
       const ratio = this.maxSpeed / currentSpeed;
-      Matter.Body.setVelocity(this.body, {
-        x: this.body.velocity.x * ratio,
-        y: this.body.velocity.y * ratio
+      Matter.Body.setVelocity(this.carBody, {
+        x: this.carBody.velocity.x * ratio,
+        y: this.carBody.velocity.y * ratio
+      });
+      
+      // Also limit wheel velocities
+      Object.values(this.wheels).forEach(wheel => {
+        Matter.Body.setVelocity(wheel, {
+          x: wheel.velocity.x * ratio,
+          y: wheel.velocity.y * ratio
+        });
+      });
+    }
+  }
+  
+  private updateSteering(controls: CarAIOutput, deltaTime: number): void {
+    // Calculate target steering angle based on input
+    let targetAngle = 0;
+    
+    if (controls.turnLeft) targetAngle = -this.steeringAngle;
+    if (controls.turnRight) targetAngle = this.steeringAngle;
+    
+    // Gradually adjust current steering angle toward target
+    const steeringDelta = this.steeringSpeed * deltaTime * 60; // Normalize by 60fps
+    
+    if (this.currentSteeringAngle < targetAngle) {
+      this.currentSteeringAngle = Math.min(targetAngle, this.currentSteeringAngle + steeringDelta);
+    } else if (this.currentSteeringAngle > targetAngle) {
+      this.currentSteeringAngle = Math.max(targetAngle, this.currentSteeringAngle - steeringDelta);
+    }
+  }
+  
+  private updateWheels(): void {
+    // Apply steering angle to front wheels
+    const carAngle = this.carBody.angle;
+    
+    // Set front wheel angles based on steering
+    Matter.Body.setAngle(this.wheels.frontLeft, carAngle + this.currentSteeringAngle);
+    Matter.Body.setAngle(this.wheels.frontRight, carAngle + this.currentSteeringAngle);
+    
+    // Keep rear wheels aligned with car body
+    Matter.Body.setAngle(this.wheels.rearLeft, carAngle);
+    Matter.Body.setAngle(this.wheels.rearRight, carAngle);
+    
+    // Apply steering forces to create rotation
+    if (Math.abs(this.currentSteeringAngle) > 0.01) {
+      const speed = this.getSpeed();
+      
+      // Only apply steering when the car is moving
+      if (speed > 0.1) {
+        // Calculate the car's forward direction
+        const carForwardX = Math.sin(carAngle);
+        const carForwardY = -Math.cos(carAngle);
+        
+        // Calculate how much torque to apply based on speed and steering angle
+        // Slower speeds allow for sharper turns
+        const torqueFactor = 0.0002 * Math.min(1, 3 / speed);
+        const torque = this.currentSteeringAngle * torqueFactor * speed;
+        
+        // Apply torque to the car body to make it rotate
+        Matter.Body.setAngularVelocity(
+          this.carBody,
+          this.carBody.angularVelocity + torque
+        );
+        
+        // Calculate how much the front wheels resist sideways motion
+        // This creates the effect of the wheels gripping the road
+        const wheelGrip = 0.2;
+        
+        // Calculate the car's current velocity
+        const velocity = this.carBody.velocity;
+        
+        // Calculate the component of velocity in the car's forward direction
+        const forwardVelocity = carForwardX * velocity.x + carForwardY * velocity.y;
+        
+        // Calculate the new velocity that's more aligned with the car's orientation
+        // This simulates the wheels gripping the road and preventing excessive sliding
+        const newVelocityX = velocity.x * (1 - wheelGrip) + carForwardX * forwardVelocity * wheelGrip;
+        const newVelocityY = velocity.y * (1 - wheelGrip) + carForwardY * forwardVelocity * wheelGrip;
+        
+        // Apply the adjusted velocity
+        Matter.Body.setVelocity(this.carBody, { x: newVelocityX, y: newVelocityY });
+        
+        // Update wheel velocities to match the car body's movement
+        Object.values(this.wheels).forEach(wheel => {
+          // Calculate wheel's position relative to car body
+          const relativeX = wheel.position.x - this.carBody.position.x;
+          const relativeY = wheel.position.y - this.carBody.position.y;
+          
+          // Calculate wheel's velocity due to car's angular velocity
+          const angularContribX = -this.carBody.angularVelocity * relativeY;
+          const angularContribY = this.carBody.angularVelocity * relativeX;
+          
+          // Set wheel velocity to match car's velocity plus angular contribution
+          Matter.Body.setVelocity(wheel, {
+            x: newVelocityX + angularContribX,
+            y: newVelocityY + angularContribY
+          });
+        });
+      }
+    }
+  }
+  
+  private applyForceToWheel(wheel: Matter.Body, dirX: number, dirY: number, magnitude: number): void {
+    Matter.Body.applyForce(wheel, wheel.position, {
+      x: dirX * magnitude,
+      y: dirY * magnitude
+    });
+  }
+  
+  private applyBrakingForce(wheel: Matter.Body, magnitude: number): void {
+    const velocity = wheel.velocity;
+    const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    
+    if (speed > 0.1) {
+      const normalizedVelocityX = -velocity.x / speed;
+      const normalizedVelocityY = -velocity.y / speed;
+      
+      Matter.Body.applyForce(wheel, wheel.position, {
+        x: normalizedVelocityX * magnitude,
+        y: normalizedVelocityY * magnitude
       });
     }
   }
 
   getSpeed(): number {
-    const velocity = this.body.velocity;
-    return Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
+    return Math.sqrt(
+      this.carBody.velocity.x * this.carBody.velocity.x + 
+      this.carBody.velocity.y * this.carBody.velocity.y
+    );
   }
 
   getPosition(): Matter.Vector {
-    return this.body.position;
+    return this.carBody.position;
   }
   
   getAngle(): number {
-    return this.body.angle;
+    return this.carBody.angle;
   }
   
   draw(ctx: CanvasRenderingContext2D): void {
-    const { x, y } = this.body.position;
-    const angle = this.body.angle;
+    // Draw car body
+    this.drawBody(ctx);
+    
+    // Draw wheels
+    this.drawWheel(ctx, this.wheels.frontLeft);
+    this.drawWheel(ctx, this.wheels.frontRight);
+    this.drawWheel(ctx, this.wheels.rearLeft);
+    this.drawWheel(ctx, this.wheels.rearRight);
+  }
+  
+  private drawBody(ctx: CanvasRenderingContext2D): void {
+    const { x, y } = this.carBody.position;
+    const angle = this.carBody.angle;
     
     ctx.save();
     ctx.translate(x, y);
@@ -194,29 +438,51 @@ export class PhysicsCar {
     ctx.fillRect(-this.width / 2 + 5, -this.height / 2 + this.height - 10, 8, 5);
     ctx.fillRect(this.width / 2 - 13, -this.height / 2 + this.height - 10, 8, 5);
     
-    // Draw tire marks if drifting
-    if (this.isDrifting()) {
-      ctx.strokeStyle = 'rgba(0, 0, 0, 0.5)';
-      ctx.lineWidth = 2;
+    ctx.restore();
+  }
+  
+  private drawWheel(ctx: CanvasRenderingContext2D, wheel: Matter.Body): void {
+    const { x, y } = wheel.position;
+    const angle = wheel.angle;
+    const radius = this.wheelSize;
+    
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(angle);
+    
+    // Wheel body
+    ctx.fillStyle = '#333333';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Wheel details (hub and spokes)
+    ctx.fillStyle = '#888888';
+    ctx.beginPath();
+    ctx.arc(0, 0, radius * 0.4, 0, Math.PI * 2);
+    ctx.fill();
+    
+    // Spokes
+    ctx.strokeStyle = '#888888';
+    ctx.lineWidth = 2;
+    for (let i = 0; i < 4; i++) {
+      const spokeAngle = i * Math.PI / 2;
       ctx.beginPath();
-      ctx.moveTo(-this.width / 2, this.height / 2);
-      ctx.lineTo(-this.width / 2, this.height / 2 + 5);
-      ctx.moveTo(this.width / 2, this.height / 2);
-      ctx.lineTo(this.width / 2, this.height / 2 + 5);
+      ctx.moveTo(0, 0);
+      ctx.lineTo(Math.cos(spokeAngle) * radius, Math.sin(spokeAngle) * radius);
       ctx.stroke();
     }
     
     ctx.restore();
   }
   
-  // Check if the car is drifting
-  private isDrifting(): boolean {
+  isDrifting(): boolean {
     // Get the car's forward direction
-    const forwardX = Math.sin(this.body.angle);
-    const forwardY = -Math.cos(this.body.angle);
+    const forwardX = Math.sin(this.carBody.angle);
+    const forwardY = -Math.cos(this.carBody.angle);
     
     // Get the car's velocity direction
-    const velocity = this.body.velocity;
+    const velocity = this.carBody.velocity;
     const speed = Math.sqrt(velocity.x * velocity.x + velocity.y * velocity.y);
     
     if (speed < 1) return false;
@@ -232,6 +498,6 @@ export class PhysicsCar {
     const angle = Math.acos(Math.min(1, Math.max(-1, dotProduct)));
     
     // Car is drifting if the angle is significant
-    return angle > 0.2; // About 11.5 degrees
+    return angle > 0.3; // About 17 degrees
   }
 }
