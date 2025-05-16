@@ -15,7 +15,7 @@ A top-down car game built with TypeScript where players can drive manually or co
 ### Prerequisites
 
 - Node.js and npm installed on your machine
-- For AI development: A language that compiles to WebAssembly (C/C++, Rust, etc.)
+- For AI development: A language that compiles to WebAssembly (C/C++, Rust, Go, etc.)
 
 ### Installation
 
@@ -74,6 +74,7 @@ See [COMPETITION.md](COMPETITION.md) for detailed instructions on creating and s
     - `c-sample/`: Sample C implementation for WebAssembly
     - `rust-sample/`: Sample Rust implementation for WebAssembly
     - `assemblyscript-sample/`: Sample AssemblyScript implementation for WebAssembly
+    - `go-sample/`: Sample Go implementation for WebAssembly
   - `car.ts`: Car physics and rendering
   - `road.ts`: Road environment
   - `game.ts`: Game logic

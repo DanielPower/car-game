@@ -37,9 +37,30 @@ export class WasmLoader {
       // Compile the module
       const module = await WebAssembly.compile(wasmBytes);
       
-      // Instantiate the module with empty imports
-      // This makes it language-agnostic - the WASM file must include everything it needs
-      const instance = await WebAssembly.instantiate(module, {});
+      // Create imports object with WASI stubs for TinyGo compatibility
+      // These stubs provide the minimum implementation of the WebAssembly System Interface (WASI)
+      // required by TinyGo-compiled WebAssembly modules to function in the browser environment
+      const imports = {
+        // WASI preview1 API stubs - required for TinyGo compatibility
+        wasi_snapshot_preview1: {
+          proc_exit: () => {}, // Process exit function (no-op in browser)
+          fd_write: () => { return 0; }, // File descriptor write
+          fd_close: () => { return 0; }, // File descriptor close
+          fd_seek: () => { return 0; }, // File descriptor seek
+          fd_read: () => { return 0; }, // File descriptor read
+          environ_sizes_get: () => { return 0; }, // Get environment sizes
+          environ_get: () => { return 0; }, // Get environment variables
+          clock_time_get: () => { return 0; }, // Get clock time
+          random_get: () => { return 0; }, // Get random bytes
+          sched_yield: () => { return 0; } // Yield scheduler
+        },
+        env: {
+          // Environment variables can be added here if needed
+        }
+      };
+      
+      // Instantiate the module with the imports
+      const instance = await WebAssembly.instantiate(module, imports);
       
       // Create and cache the module wrapper
       const wasmModule: WasmModule = { instance };
