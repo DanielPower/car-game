@@ -10,7 +10,6 @@ const applyLateralFriction = (wheel: Matter.Body, gripStrength: number) => {
     x: Math.cos(angle + Math.PI / 2),
     y: Math.sin(angle + Math.PI / 2),
   };
-  console.log(angle, right);
 
   // Project velocity onto right vector
   const lateralSpeed = velocity.x * right.x + velocity.y * right.y;
@@ -53,29 +52,31 @@ export class Car {
     const group = Matter.Body.nextGroup(true);
     this.carBody = Matter.Bodies.rectangle(x, y, 50, 20, {
       label: "car",
-      friction: 0,
-      restitution: 0,
-      frictionAir: 0.1,
       collisionFilter: { group: group },
+      frictionStatic: 0.5,
     });
     this.rearWheels = [
       Matter.Bodies.rectangle(x - 20, y - 13, 20, 10, {
         label: "wheel",
         collisionFilter: { group: group },
+        frictionStatic: 0.5,
       }),
       Matter.Bodies.rectangle(x - 20, y + 13, 20, 10, {
         label: "wheel",
         collisionFilter: { group: group },
+        frictionStatic: 0.5,
       }),
     ];
     this.frontWheels = [
       Matter.Bodies.rectangle(x + 20, y - 10, 20, 10, {
         label: "wheel",
         collisionFilter: { group: group },
+        frictionStatic: 0.5,
       }),
       Matter.Bodies.rectangle(x + 20, y + 10, 20, 10, {
         label: "wheel",
         collisionFilter: { group: group },
+        frictionStatic: 0.5,
       }),
     ];
     this.constraints = [
@@ -85,8 +86,8 @@ export class Car {
         pointA: { x: -20, y: -13 },
         pointB: { x: 0, y: 0 },
         stiffness: 0.7,
-        damping: 0.1,
-        length: 0,
+        damping: 0.5,
+        length: 0.1,
       }),
       Matter.Constraint.create({
         bodyA: this.carBody,
@@ -94,8 +95,8 @@ export class Car {
         pointA: { x: -20, y: 13 },
         pointB: { x: 0, y: 0 },
         stiffness: 0.7,
-        damping: 0.1,
-        length: 0,
+        damping: 0.5,
+        length: 0.1,
       }),
       Matter.Constraint.create({
         bodyA: this.carBody,
@@ -103,8 +104,8 @@ export class Car {
         pointA: { x: 20, y: -10 },
         pointB: { x: 0, y: 0 },
         stiffness: 0.7,
-        damping: 0.1,
-        length: 0,
+        damping: 0.5,
+        length: 0.1,
       }),
       Matter.Constraint.create({
         bodyA: this.carBody,
@@ -112,8 +113,8 @@ export class Car {
         pointA: { x: 20, y: 10 },
         pointB: { x: 0, y: 0 },
         stiffness: 0.7,
-        damping: 0.1,
-        length: 0,
+        damping: 0.5,
+        length: 0.1,
       }),
     ];
     Matter.Composite.add(engine.world, [
@@ -138,22 +139,27 @@ export class Car {
     });
 
     [...this.rearWheels, ...this.frontWheels].forEach((wheel) => {
-      if (inputs.accelerate) {
-        const driveForce = 0.002; // Tune this
-        const forward = {
-          x: Math.cos(wheel.angle) * driveForce * dt,
-          y: Math.sin(wheel.angle) * driveForce * dt,
-        };
-        Matter.Body.applyForce(wheel, wheel.position, forward);
-      }
-      applyLateralFriction(wheel, 0.9);
+      Matter.Body.setAngle(wheel, this.carBody.angle);
     });
     this.frontWheels.forEach((wheel) => {
       if (inputs.turnLeft) {
-        Matter.Body.rotate(wheel, -1 * dt);
+        Matter.Body.setAngle(wheel, this.carBody.angle - Math.PI / 5);
       }
       if (inputs.turnRight) {
-        Matter.Body.rotate(wheel, 1 * dt);
+        Matter.Body.setAngle(wheel, this.carBody.angle + Math.PI / 5);
+      }
+    });
+    [...this.rearWheels, ...this.frontWheels].forEach((wheel) => {
+      applyLateralFriction(wheel, 0.005 * dt);
+    });
+    this.rearWheels.forEach((wheel) => {
+      if (inputs.accelerate) {
+        const driveForce = 0.0001 * dt; // Tune this
+        const forward = {
+          x: Math.cos(wheel.angle) * driveForce,
+          y: Math.sin(wheel.angle) * driveForce,
+        };
+        Matter.Body.applyForce(wheel, wheel.position, forward);
       }
     });
   }

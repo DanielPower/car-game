@@ -17,7 +17,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     const dt = currentTime - lastRenderTime;
     lastRenderTime = currentTime;
     game.update(dt);
-    setTimeout(updateLoop);
+    setTimeout(updateLoop, 16);
   };
 
   const renderLoop = () => {
