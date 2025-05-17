@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@types/matter-js": "^0.19.8",
+    "box2d-wasm": "^7.0.0",
     "matter-js": "^0.20.0"
   }
 }
