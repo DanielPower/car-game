@@ -1,4 +1,5 @@
 import * as RAPIER from "@dimforge/rapier2d-compat";
+import { COLLISION_GROUPS } from "./game";
 import type { CarAI } from "./ai/CarAI";
 import * as vec from "./utils/math";
 import type { Vec2 } from "./types";
@@ -76,8 +77,6 @@ export class Car {
     this.inputController = inputController;
     this.physicsScale = physicsScale;
 
-    const carGroup = 1;
-
     const carBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y);
     this.carBody = this.world.createRigidBody(carBodyDesc);
 
@@ -85,7 +84,10 @@ export class Car {
       this.carWidth / this.physicsScale / 2,
       this.carHeight / this.physicsScale / 2,
     )
-      .setCollisionGroups(carGroup)
+      .setCollisionGroups(
+        // Car is in CAR group and can collide with WALL group but not WHEEL group
+        (COLLISION_GROUPS.CAR << 16) | COLLISION_GROUPS.WALL
+      )
       .setFriction(0.2);
     this.carCollider = this.world.createCollider(carColliderDesc, this.carBody);
 
@@ -125,7 +127,7 @@ export class Car {
     ];
 
     wheelConfigs.forEach((config) => {
-      this.createWheel(x, y, config, carGroup);
+      this.createWheel(x, y, config);
     });
   }
 
@@ -133,7 +135,6 @@ export class Car {
     carX: number,
     carY: number,
     config: WheelConfig,
-    carGroup: number,
   ): void {
     const wheelX = carX + config.offsetX / this.physicsScale;
     const wheelY = carY + config.offsetY / this.physicsScale;
@@ -146,7 +147,10 @@ export class Car {
       config.width / this.physicsScale / 2,
       config.height / this.physicsScale / 2,
     )
-      .setCollisionGroups(carGroup)
+      .setCollisionGroups(
+        // Wheel is in WHEEL group and can collide with WALL group but not CAR group
+        (COLLISION_GROUPS.WHEEL << 16) | COLLISION_GROUPS.WALL
+      )
       .setFriction(0.7);
     const collider = this.world.createCollider(colliderDesc, wheel);
 
@@ -219,7 +223,7 @@ export class Car {
         }
       }
 
-      const driveForce = 0.1 * dt;
+      const driveForce = 0.07 * dt;
       if (inputs.accelerate && wheel.userData.wheelType === "rear") {
         const forward = vec.fromAngle(wheel.rotation(), driveForce);
         wheel.applyImpulse(new RAPIER.Vector2(forward.x, forward.y), true);

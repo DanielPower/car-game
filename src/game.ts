@@ -6,6 +6,14 @@ import type { LevelConfig } from "./types";
 import * as vec from "./utils/math";
 import { generateTrackBoundaries, isPointOnRoad } from "./utils/road";
 
+// Define collision groups
+export const COLLISION_GROUPS = {
+  CAR: 0b0000_0000_0000_0001, // Group 1
+  WHEEL: 0b0000_0000_0000_0010, // Group 2
+  WALL: 0b0000_0000_0000_0100, // Group 3
+  TRACK: 0b0000_0000_0000_1000, // Group 4
+};
+
 export class Game {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -17,6 +25,7 @@ export class Game {
     innerBoundary: RAPIER.Collider[];
     outerBoundary: RAPIER.Collider[];
   } | null = null;
+  wallColliders: RAPIER.Collider[] = [];
   mousePos: { x: number; y: number } | null = null;
   mouseListenerSet: boolean = false;
 
@@ -35,6 +44,9 @@ export class Game {
         this.currentLevel,
         this.physicsScale,
       );
+
+      // Generate wall colliders
+      this.generateWallColliders();
 
       // Create car at the level's start position
       const playerAI = new PlayerAI();
@@ -147,6 +159,7 @@ export class Game {
     this.drawOffRoadBackground();
     this.drawTrackSegments();
     this.drawCheckpoints();
+    this.drawWalls();
     this.drawTerrainLegend();
   }
 
@@ -240,6 +253,26 @@ export class Game {
     }
   }
 
+  private drawWalls(): void {
+    if (!this.currentLevel.wallPaths) return;
+
+    this.ctx.strokeStyle = "#ff0000";
+    this.ctx.lineWidth = 4;
+
+    for (const wallPath of this.currentLevel.wallPaths) {
+      this.ctx.beginPath();
+      for (let i = 0; i < wallPath.length; i++) {
+        const point = wallPath[i];
+        if (i === 0) {
+          this.ctx.moveTo(point.x, point.y);
+        } else {
+          this.ctx.lineTo(point.x, point.y);
+        }
+      }
+      this.ctx.stroke();
+    }
+  }
+
   private drawTerrainLegend(): void {
     this.ctx.font = "14px Arial";
     this.ctx.fillStyle = "white";
@@ -266,5 +299,43 @@ export class Game {
       40,
       75,
     );
+  }
+
+  private generateWallColliders(): void {
+    if (!this.world || !this.currentLevel.wallPaths) return;
+
+    // Clear any existing wall colliders
+    for (const collider of this.wallColliders) {
+      this.world.removeCollider(collider, true);
+    }
+    this.wallColliders = [];
+
+    // Create colliders for each wall path
+    for (const wallPath of this.currentLevel.wallPaths) {
+      for (let i = 0; i < wallPath.length - 1; i++) {
+        const current = wallPath[i];
+        const next = wallPath[i + 1];
+
+        // Create a segment collider for this wall segment
+        const wallSegmentDesc = RAPIER.ColliderDesc.segment(
+          new RAPIER.Vector2(
+            current.x / this.physicsScale,
+            current.y / this.physicsScale
+          ),
+          new RAPIER.Vector2(
+            next.x / this.physicsScale,
+            next.y / this.physicsScale
+          )
+        )
+        .setRestitution(0.2) // Add some bounce to walls
+        .setCollisionGroups(
+          // Wall is in WALL group and can collide with CAR and WHEEL groups
+          (COLLISION_GROUPS.WALL << 16) | (COLLISION_GROUPS.CAR | COLLISION_GROUPS.WHEEL)
+        );
+
+        const wallSegment = this.world.createCollider(wallSegmentDesc);
+        this.wallColliders.push(wallSegment);
+      }
+    }
   }
 }

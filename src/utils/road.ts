@@ -2,6 +2,7 @@ import RAPIER from "@dimforge/rapier2d-compat";
 import { LevelConfig, Vec2 } from "../types";
 import { pointToLineDistanceSquared } from "./math";
 import * as vec from "./math";
+import { COLLISION_GROUPS } from "../game";
 
 export function isPointOnRoad(point: Vec2, level: LevelConfig): boolean {
   const halfWidthSquared = Math.pow(level.trackWidth / 2, 2);
@@ -63,7 +64,12 @@ export function generateTrackBoundaries(
         innerPoint2.x / physicsScale,
         innerPoint2.y / physicsScale,
       ),
-    ).setFriction(level.roadFriction);
+    )
+    .setFriction(level.roadFriction)
+    .setCollisionGroups(
+      // Track boundary is in TRACK group and can collide with CAR and WHEEL groups
+      (COLLISION_GROUPS.TRACK << 16) | (COLLISION_GROUPS.CAR | COLLISION_GROUPS.WHEEL)
+    );
 
     const innerSegment = world.createCollider(innerSegmentDesc);
     innerBoundary.push(innerSegment);
@@ -78,7 +84,12 @@ export function generateTrackBoundaries(
         outerPoint2.x / physicsScale,
         outerPoint2.y / physicsScale,
       ),
-    ).setFriction(level.roadFriction);
+    )
+    .setFriction(level.roadFriction)
+    .setCollisionGroups(
+      // Track boundary is in TRACK group and can collide with CAR and WHEEL groups
+      (COLLISION_GROUPS.TRACK << 16) | (COLLISION_GROUPS.CAR | COLLISION_GROUPS.WHEEL)
+    );
 
     const outerSegment = world.createCollider(outerSegmentDesc);
     outerBoundary.push(outerSegment);
