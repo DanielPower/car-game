@@ -24,7 +24,7 @@ export const setupErrorToasts = () => {
     Toast.error(message, { duration: 8000 });
   };
 
-  window.onerror = function (message, source, lineno, colno, error) {
+  window.onerror = function (message, _source, _lineno, _colno, error) {
     const errorMsg = error ? error.stack || error.message : String(message);
     Toast.error(`Unhandled error: ${errorMsg}`, { duration: 10000 });
     return false; // Let default handler run as well
@@ -49,4 +49,3 @@ export const setupErrorToasts = () => {
     Toast.error(message, { duration: 10000 });
   });
 };
-

@@ -184,11 +184,10 @@ export class Car {
     
     // Handle steering
     this.frontWheels.forEach((wheel) => {
-      if (inputs.turnLeft) {
-        wheel.setRotation(carRotation - Math.PI / 5, true);
-      }
-      if (inputs.turnRight) {
-        wheel.setRotation(carRotation + Math.PI / 5, true);
+      // Apply steering angle - scale from -1...1 to -PI/5...PI/5
+      if (inputs.steeringAngle !== 0) {
+        const steeringRadians = inputs.steeringAngle * Math.PI / 5;
+        wheel.setRotation(carRotation + steeringRadians, true);
       }
     });
     

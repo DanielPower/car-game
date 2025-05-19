@@ -17,8 +17,7 @@ export interface CarAIInput {
 export interface CarAIOutput {
   accelerate: boolean;
   brake: boolean;
-  turnLeft: boolean;
-  turnRight: boolean;
+  steeringAngle: number; // -1 (full left) to 1 (full right)
 }
 
 export interface CarAI {

@@ -15,14 +15,10 @@
   "description": "",
   "devDependencies": {
     "@vitejs/plugin-react": "^4.4.1",
-    "ts-node": "^10.9.2",
     "typescript": "^5.8.3",
     "vite": "^6.3.5"
   },
   "dependencies": {
-    "@dimforge/rapier2d-compat": "^0.17.0",
-    "@types/matter-js": "^0.19.8",
-    "box2d-wasm": "^7.0.0",
-    "matter-js": "^0.20.0"
+    "@dimforge/rapier2d-compat": "^0.17.0"
   }
 }
