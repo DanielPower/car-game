@@ -8,6 +8,24 @@ document.addEventListener("DOMContentLoaded", async () => {
     console.error("Canvas element not found");
     return;
   }
+  
+  // Set canvas size to fill the window
+  canvas.width = 800;
+  canvas.height = 600;
+  
+  // Handle window resize
+  window.addEventListener("resize", () => {
+    const maxWidth = Math.min(window.innerWidth - 20, 1200);
+    const maxHeight = Math.min(window.innerHeight - 20, 800);
+    canvas.width = maxWidth;
+    canvas.height = maxHeight;
+  });
+  
+  // Initial resize
+  const maxWidth = Math.min(window.innerWidth - 20, 1200);
+  const maxHeight = Math.min(window.innerHeight - 20, 800);
+  canvas.width = maxWidth;
+  canvas.height = maxHeight;
 
   const game = new Game(canvas);
 

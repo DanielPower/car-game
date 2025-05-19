@@ -1,5 +1,6 @@
 import * as RAPIER from "@dimforge/rapier2d-compat";
 import type { CarAI } from "./ai/CarAI";
+import { isPointOnRoad } from "./levels/level1";
 
 const applyLateralFriction = (wheel: RAPIER.RigidBody, gripStrength: number) => {
   const velocity = wheel.linvel();
@@ -41,6 +42,7 @@ export class Car {
   joints: RAPIER.ImpulseJoint[];
   inputController: CarAI;
   physicsScale: number;
+  // No need for a single friction value, as each wheel tracks its own
   constructor({
     world,
     inputController,
@@ -159,6 +161,25 @@ export class Car {
     this.joints.push(rightFrontJoint);
   }
 
+  // Set friction for a specific wheel
+  setWheelFriction(collider: RAPIER.Collider, friction: number) {
+    collider.setFriction(friction);
+  }
+  
+  // Get the position of a wheel in world space
+  getWheelPosition(wheel: RAPIER.RigidBody): { x: number, y: number } {
+    const pos = wheel.translation();
+    return {
+      x: pos.x * this.physicsScale,
+      y: pos.y * this.physicsScale
+    };
+  }
+  
+  isWheelOnRoad(wheel: RAPIER.RigidBody): boolean {
+    const wheelPos = this.getWheelPosition(wheel);
+    return isPointOnRoad(wheelPos, this.inputController.levelData);
+  }
+
   update(dt: number) {
     const carPosition = this.carBody.translation();
     const carRotation = this.carBody.rotation();
@@ -175,6 +196,7 @@ export class Car {
       roadWidth: 800,
       roadHeight: 600,
       deltaTime: dt,
+      level: this.inputController.levelData,
     });
 
     // Set wheel angles
@@ -191,9 +213,25 @@ export class Car {
       }
     });
     
-    // Apply lateral friction to all wheels
-    [...this.rearWheels, ...this.frontWheels].forEach((wheel) => {
-      applyLateralFriction(wheel, 0.1 * dt);
+    // Apply lateral friction to all wheels - individually check and set each wheel's friction
+    [...this.rearWheels, ...this.frontWheels].forEach((wheel, index) => {
+      // Check if this wheel is on the road
+      const isOnRoad = this.isWheelOnRoad(wheel);
+      
+      // Apply appropriate friction based on whether the wheel is on the road
+      const wheelFriction = isOnRoad 
+        ? this.inputController.levelData.roadFriction
+        : this.inputController.levelData.offRoadFriction;
+      
+      // Set collider friction
+      const collider = index < this.rearWheels.length 
+        ? this.rearColliders[index] 
+        : this.frontColliders[index - this.rearWheels.length];
+      
+      this.setWheelFriction(collider, wheelFriction);
+      
+      // Apply lateral friction with appropriate strength
+      applyLateralFriction(wheel, wheelFriction * 0.1 * dt);
     });
     
     // Apply drive force to rear wheels
@@ -225,38 +263,55 @@ export class Car {
     ctx.fillStyle = '#3498db';
     ctx.fillRect(-carWidth/2, -carHeight/2, carWidth, carHeight);
     
+    // Chassis highlighting to show on-road status
+    [...this.rearWheels, ...this.frontWheels].forEach((wheel, index) => {
+      const isOnRoad = this.isWheelOnRoad(wheel);
+      
+      // Draw indicator dots at corners to show each wheel's status
+      const offsetX = index < 2 ? -carWidth/3 : carWidth/3;
+      const offsetY = index % 2 === 0 ? -carHeight/3 : carHeight/3;
+      
+      ctx.fillStyle = isOnRoad ? '#2ecc71' : '#e74c3c';
+      ctx.beginPath();
+      ctx.arc(offsetX, offsetY, 3, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    
     ctx.restore();
     
     // Draw wheels
     const wheelWidth = 20;
     const wheelHeight = 10;
     
-    // Draw rear wheels
-    this.rearWheels.forEach(wheel => {
+    // Draw all wheels with on/off road color indicators
+    [...this.rearWheels, ...this.frontWheels].forEach((wheel, index) => {
       const wheelPos = wheel.translation();
       const wheelAngle = wheel.rotation();
+      const isOnRoad = this.isWheelOnRoad(wheel);
       
       ctx.save();
       ctx.translate(wheelPos.x * this.physicsScale, wheelPos.y * this.physicsScale);
       ctx.rotate(wheelAngle);
       
-      ctx.fillStyle = '#2c3e50';
+      // Draw wheel with border color indicating on/off road
+      const borderColor = isOnRoad ? '#2ecc71' : '#e74c3c';
+      const fillColor = '#2c3e50';
+      
+      // Draw wheel border (indicating road status)
+      ctx.fillStyle = borderColor;
+      ctx.fillRect(-wheelWidth/2 - 2, -wheelHeight/2 - 2, wheelWidth + 4, wheelHeight + 4);
+      
+      // Draw wheel center
+      ctx.fillStyle = fillColor;
       ctx.fillRect(-wheelWidth/2, -wheelHeight/2, wheelWidth, wheelHeight);
       
-      ctx.restore();
-    });
-    
-    // Draw front wheels
-    this.frontWheels.forEach(wheel => {
-      const wheelPos = wheel.translation();
-      const wheelAngle = wheel.rotation();
-      
-      ctx.save();
-      ctx.translate(wheelPos.x * this.physicsScale, wheelPos.y * this.physicsScale);
-      ctx.rotate(wheelAngle);
-      
-      ctx.fillStyle = '#2c3e50';
-      ctx.fillRect(-wheelWidth/2, -wheelHeight/2, wheelWidth, wheelHeight);
+      // Draw friction indicator line
+      ctx.strokeStyle = borderColor;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(0, -wheelHeight/2);
+      ctx.lineTo(0, wheelHeight/2);
+      ctx.stroke();
       
       ctx.restore();
     });

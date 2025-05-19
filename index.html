@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Top-Down Car Game</title>
+    <title>Top-Down Car Game with Track Physics</title>
     <style>
         body {
             margin: 0;
@@ -27,6 +27,14 @@
             margin-top: 10px;
             text-align: center;
             font-family: Arial, sans-serif;
+            line-height: 1.5;
+            padding: 5px;
+            background-color: rgba(0, 0, 0, 0.5);
+            border-radius: 5px;
+        }
+        span {
+            display: inline-block;
+            margin: 2px 0;
         }
     </style>
 </head>
@@ -35,6 +43,10 @@
         <canvas id="gameCanvas" width="800" height="600"></canvas>
         <div class="controls">
             Controls: Arrow keys to drive, Space to brake
+            <br>
+            <span style="font-size: 0.9em;">Green wheel indicators = on road (good traction)</span>
+            <br>
+            <span style="font-size: 0.9em;">Red wheel indicators = off road (reduced traction)</span>
         </div>
     </div>
     <script type="module" src="/src/index.ts"></script>

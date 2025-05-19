@@ -1,3 +1,5 @@
+import type { LevelConfig } from "../types";
+
 export interface CarAIInput {
   x: number;
   y: number;
@@ -5,13 +7,15 @@ export interface CarAIInput {
   rotation: number;
   width: number;
   height: number;
-  
+
   roadWidth: number;
   roadHeight: number;
-  
+
   deltaTime: number;
-  
+
   obstacles?: { x: number; y: number; width: number; height: number }[];
+
+  level: LevelConfig;
 }
 
 export interface CarAIOutput {
@@ -22,4 +26,5 @@ export interface CarAIOutput {
 
 export interface CarAI {
   process(input: CarAIInput): CarAIOutput;
+  levelData: LevelConfig; // Current level configuration
 }
