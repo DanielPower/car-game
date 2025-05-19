@@ -2,16 +2,44 @@ import type { CarAI, CarAIInput, CarAIOutput } from "./CarAI";
 import type { LevelConfig } from "../types";
 import { level1 } from "../levels/level1";
 
+/**
+ * Maps keyboard keys to car control actions
+ */
+interface KeyMap {
+  left: string[];
+  right: string[];
+  accelerate: string[];
+  brake: string[];
+}
+
 export class PlayerAI implements CarAI {
   private keys: Set<string> = new Set();
   levelData: LevelConfig = level1;
+  
+  // Key mapping configuration
+  private keyMap: KeyMap = {
+    left: ["ArrowLeft", "a"],
+    right: ["ArrowRight", "d"],
+    accelerate: ["ArrowUp", "w"],
+    brake: ["ArrowDown", "s"],
+  };
+  
+  // Keys that should have their default browser action prevented
+  private preventDefaultKeys = [
+    "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "
+  ];
 
   constructor() {
+    this.setupKeyboardListeners();
+  }
+  
+  /**
+   * Set up keyboard event handlers
+   */
+  private setupKeyboardListeners(): void {
     window.addEventListener("keydown", (e) => {
       this.keys.add(e.key);
-      if (
-        ["ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight", " "].includes(e.key)
-      ) {
+      if (this.preventDefaultKeys.includes(e.key)) {
         e.preventDefault();
       }
     });
@@ -20,25 +48,28 @@ export class PlayerAI implements CarAI {
       this.keys.delete(e.key);
     });
   }
+  
+  /**
+   * Check if any of the keys for a specific action are pressed
+   */
+  private isActionActive(action: keyof KeyMap): boolean {
+    return this.keyMap[action].some(key => this.keys.has(key));
+  }
 
   process(input: CarAIInput): CarAIOutput {
     // Update the level data from input
     if (input.level) {
       this.levelData = input.level;
     }
+    
+    // Calculate steering angle based on key input
     let steeringAngle = 0;
-
-    if (this.keys.has("ArrowLeft") || this.keys.has("a")) {
-      steeringAngle -= 1;
-    }
-
-    if (this.keys.has("ArrowRight") || this.keys.has("d")) {
-      steeringAngle += 1;
-    }
+    if (this.isActionActive('left')) steeringAngle -= 1;
+    if (this.isActionActive('right')) steeringAngle += 1;
 
     return {
-      accelerate: this.keys.has("ArrowUp") || this.keys.has("w"),
-      brake: this.keys.has("ArrowDown") || this.keys.has("s"),
+      accelerate: this.isActionActive('accelerate'),
+      brake: this.isActionActive('brake'),
       steeringAngle: steeringAngle,
     };
   }

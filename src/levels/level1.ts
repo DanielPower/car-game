@@ -1,5 +1,6 @@
 import * as RAPIER from "@dimforge/rapier2d-compat";
-import type { LevelConfig } from "../types";
+import type { LevelConfig, Vec2 } from "../types";
+import * as vec from "../utils/math";
 
 export const level1: LevelConfig = {
   trackWidth: 120, // Width of the track in pixels
@@ -44,33 +45,30 @@ export function generateTrackBoundaries(
     const next = level.trackPath[i + 1];
 
     // Calculate direction vector
-    const dx = next.x - current.x;
-    const dy = next.y - current.y;
-
+    const direction = vec.subtract(next, current);
+    
     // Calculate normal vector (perpendicular to direction)
-    const length = Math.sqrt(dx * dx + dy * dy);
-    const normalX = -dy / length;
-    const normalY = dx / length;
-
+    const normal = vec.normal(vec.normalize(direction));
+    
     // Calculate half-width for the track
     const halfWidth = level.trackWidth / 2;
+    
+    // Calculate offset vectors for inner and outer edges
+    const innerOffset = vec.multiply(normal, -halfWidth);
+    const outerOffset = vec.multiply(normal, halfWidth);
 
-    // Inner boundary point
-    const innerX1 = current.x - normalX * halfWidth;
-    const innerY1 = current.y - normalY * halfWidth;
-    const innerX2 = next.x - normalX * halfWidth;
-    const innerY2 = next.y - normalY * halfWidth;
+    // Inner boundary points
+    const innerPoint1 = vec.add(current, innerOffset);
+    const innerPoint2 = vec.add(next, innerOffset);
 
-    // Outer boundary point
-    const outerX1 = current.x + normalX * halfWidth;
-    const outerY1 = current.y + normalY * halfWidth;
-    const outerX2 = next.x + normalX * halfWidth;
-    const outerY2 = next.y + normalY * halfWidth;
+    // Outer boundary points
+    const outerPoint1 = vec.add(current, outerOffset);
+    const outerPoint2 = vec.add(next, outerOffset);
 
     // Create colliders for inner boundary segment
     const innerSegmentDesc = RAPIER.ColliderDesc.segment(
-      new RAPIER.Vector2(innerX1 / physicsScale, innerY1 / physicsScale),
-      new RAPIER.Vector2(innerX2 / physicsScale, innerY2 / physicsScale),
+      new RAPIER.Vector2(innerPoint1.x / physicsScale, innerPoint1.y / physicsScale),
+      new RAPIER.Vector2(innerPoint2.x / physicsScale, innerPoint2.y / physicsScale),
     ).setFriction(level.roadFriction);
 
     const innerSegment = world.createCollider(innerSegmentDesc);
@@ -78,8 +76,8 @@ export function generateTrackBoundaries(
 
     // Create colliders for outer boundary segment
     const outerSegmentDesc = RAPIER.ColliderDesc.segment(
-      new RAPIER.Vector2(outerX1 / physicsScale, outerY1 / physicsScale),
-      new RAPIER.Vector2(outerX2 / physicsScale, outerY2 / physicsScale),
+      new RAPIER.Vector2(outerPoint1.x / physicsScale, outerPoint1.y / physicsScale),
+      new RAPIER.Vector2(outerPoint2.x / physicsScale, outerPoint2.y / physicsScale),
     ).setFriction(level.roadFriction);
 
     const outerSegment = world.createCollider(outerSegmentDesc);
@@ -91,18 +89,20 @@ export function generateTrackBoundaries(
 
 // Helper function to check if a point is on the road
 export function isPointOnRoad(
-  point: { x: number; y: number },
+  point: Vec2,
   level: LevelConfig,
 ): boolean {
+  const halfWidthSquared = Math.pow(level.trackWidth / 2, 2);
+  
   for (let i = 0; i < level.trackPath.length - 1; i++) {
     const current = level.trackPath[i];
     const next = level.trackPath[i + 1];
 
     // Calculate the squared distance from point to line segment
-    const distSq = pointToLineDistSq(point, current, next);
+    const distSq = vec.pointToLineDistanceSquared(point, current, next);
 
     // If point is within half track width of any segment, it's on the road
-    if (distSq <= Math.pow(level.trackWidth / 2, 2)) {
+    if (distSq <= halfWidthSquared) {
       return true;
     }
   }
@@ -110,38 +110,4 @@ export function isPointOnRoad(
   return false;
 }
 
-// Calculate squared distance from point to line segment
-function pointToLineDistSq(
-  point: { x: number; y: number },
-  lineStart: { x: number; y: number },
-  lineEnd: { x: number; y: number },
-): number {
-  const dx = lineEnd.x - lineStart.x;
-  const dy = lineEnd.y - lineStart.y;
-  const lengthSq = dx * dx + dy * dy;
-
-  if (lengthSq === 0) {
-    // Line segment is a point
-    const deltaX = point.x - lineStart.x;
-    const deltaY = point.y - lineStart.y;
-    return deltaX * deltaX + deltaY * deltaY;
-  }
-
-  // Calculate projection of point onto line segment
-  const t = Math.max(
-    0,
-    Math.min(
-      1,
-      ((point.x - lineStart.x) * dx + (point.y - lineStart.y) * dy) / lengthSq,
-    ),
-  );
-
-  // Calculate closest point on line segment
-  const projX = lineStart.x + t * dx;
-  const projY = lineStart.y + t * dy;
-
-  // Calculate squared distance to closest point
-  const deltaX = point.x - projX;
-  const deltaY = point.y - projY;
-  return deltaX * deltaX + deltaY * deltaY;
-}
+// This function is now provided by Vector2.pointToLineDistanceSquared in utils/math.ts
