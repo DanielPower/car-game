@@ -1,13 +1,10 @@
 import * as RAPIER from "@dimforge/rapier2d-compat";
 import { Car } from "./car";
 import { PlayerAI } from "./ai/PlayerAI";
-import {
-  level1,
-  generateTrackBoundaries,
-  isPointOnRoad,
-} from "./levels/level1";
-import type { LevelConfig, Vec2 } from "./types";
+import { level1 } from "./levels/level1";
+import type { LevelConfig } from "./types";
 import * as vec from "./utils/math";
+import { generateTrackBoundaries, isPointOnRoad } from "./utils/road";
 
 export class Game {
   canvas: HTMLCanvasElement;
@@ -89,25 +86,25 @@ export class Game {
    */
   private initMouseTracking(): void {
     if (this.mouseListenerSet) return;
-    
+
     const handleMouseMove = (e: MouseEvent) => {
       const rect = this.canvas.getBoundingClientRect();
-      this.mousePos = { 
+      this.mousePos = {
         x: e.clientX - rect.left,
-        y: e.clientY - rect.top
+        y: e.clientY - rect.top,
       };
     };
 
     this.canvas.addEventListener("mousemove", handleMouseMove);
     this.mouseListenerSet = true;
   }
-  
+
   /**
    * Draw debug information overlay
    */
   drawDebugInfo(): void {
     this.initMouseTracking();
-    
+
     // Draw mouse terrain info if mouse position is available
     if (this.mousePos) {
       const isOnRoad = isPointOnRoad(this.mousePos, this.currentLevel);
@@ -152,10 +149,7 @@ export class Game {
     this.drawCheckpoints();
     this.drawTerrainLegend();
   }
-  
-  /**
-   * Draw the off-road background with texture
-   */
+
   private drawOffRoadBackground(): void {
     // Fill background with off-road color
     this.ctx.fillStyle = "#5d4037"; // Brown for off-road
@@ -174,10 +168,7 @@ export class Game {
       }
     }
   }
-  
-  /**
-   * Draw individual track segments
-   */
+
   private drawTrackSegments(): void {
     this.ctx.fillStyle = "#888888"; // Gray for the road
 
@@ -188,14 +179,14 @@ export class Game {
       // Calculate direction and normal vectors
       const direction = vec.subtract(next, current);
       const normal = vec.normal(vec.normalize(direction));
-      
+
       // Calculate half-width for the track
       const halfWidth = this.currentLevel.trackWidth / 2;
-      
+
       // Calculate track edge points
       const innerOffset = vec.multiply(normal, -halfWidth);
       const outerOffset = vec.multiply(normal, halfWidth);
-      
+
       const innerPoint1 = vec.add(current, innerOffset);
       const innerPoint2 = vec.add(next, innerOffset);
       const outerPoint1 = vec.add(current, outerOffset);
@@ -213,13 +204,13 @@ export class Game {
       // Draw track edge lines
       this.ctx.strokeStyle = "#444444";
       this.ctx.lineWidth = 2;
-      
+
       // Inner edge
       this.ctx.beginPath();
       this.ctx.moveTo(innerPoint1.x, innerPoint1.y);
       this.ctx.lineTo(innerPoint2.x, innerPoint2.y);
       this.ctx.stroke();
-      
+
       // Outer edge
       this.ctx.beginPath();
       this.ctx.moveTo(outerPoint1.x, outerPoint1.y);
@@ -237,13 +228,10 @@ export class Game {
       this.ctx.setLineDash([]);
     }
   }
-  
-  /**
-   * Draw checkpoints on the track
-   */
+
   private drawCheckpoints(): void {
     if (!this.currentLevel.checkpoints) return;
-    
+
     this.ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
     for (const checkpoint of this.currentLevel.checkpoints) {
       this.ctx.beginPath();
@@ -251,10 +239,7 @@ export class Game {
       this.ctx.fill();
     }
   }
-  
-  /**
-   * Draw terrain type legend
-   */
+
   private drawTerrainLegend(): void {
     this.ctx.font = "14px Arial";
     this.ctx.fillStyle = "white";

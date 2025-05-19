@@ -6,6 +6,7 @@ export interface TrackPoint {
 
 export interface LevelConfig {
   trackPath: TrackPoint[];
+  wallPaths: TrackPoint[][];
   trackWidth: number;
   startPosition: { x: number; y: number };
   checkpoints?: { x: number; y: number }[];
@@ -34,3 +35,4 @@ export type Size = {
   width: number;
   height: number;
 };
+
