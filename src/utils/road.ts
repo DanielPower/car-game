@@ -67,8 +67,8 @@ export function generateTrackBoundaries(
     )
     .setFriction(level.roadFriction)
     .setCollisionGroups(
-      // Track boundary is in TRACK group and can collide with CAR and WHEEL groups
-      (COLLISION_GROUPS.TRACK << 16) | (COLLISION_GROUPS.CAR | COLLISION_GROUPS.WHEEL)
+      // Track boundary is in TRACK group but doesn't collide with CAR or WHEEL groups
+      (COLLISION_GROUPS.TRACK << 16) | 0
     );
 
     const innerSegment = world.createCollider(innerSegmentDesc);
@@ -87,8 +87,8 @@ export function generateTrackBoundaries(
     )
     .setFriction(level.roadFriction)
     .setCollisionGroups(
-      // Track boundary is in TRACK group and can collide with CAR and WHEEL groups
-      (COLLISION_GROUPS.TRACK << 16) | (COLLISION_GROUPS.CAR | COLLISION_GROUPS.WHEEL)
+      // Track boundary is in TRACK group but doesn't collide with CAR or WHEEL groups
+      (COLLISION_GROUPS.TRACK << 16) | 0
     );
 
     const outerSegment = world.createCollider(outerSegmentDesc);

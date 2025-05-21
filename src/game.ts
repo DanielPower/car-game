@@ -2,7 +2,7 @@ import * as RAPIER from "@dimforge/rapier2d-compat";
 import { Car } from "./car";
 import { PlayerAI } from "./ai/PlayerAI";
 import { level1 } from "./levels/level1";
-import type { LevelConfig } from "./types";
+import type { CheckpointState, LevelConfig, TimerState } from "./types";
 import * as vec from "./utils/math";
 import { generateTrackBoundaries, isPointOnRoad } from "./utils/road";
 
@@ -12,6 +12,7 @@ export const COLLISION_GROUPS = {
   WHEEL: 0b0000_0000_0000_0010, // Group 2
   WALL: 0b0000_0000_0000_0100, // Group 3
   TRACK: 0b0000_0000_0000_1000, // Group 4
+  CHECKPOINT: 0b0000_0000_0001_0000, // Group 5
 };
 
 export class Game {
@@ -28,6 +29,14 @@ export class Game {
   wallColliders: RAPIER.Collider[] = [];
   mousePos: { x: number; y: number } | null = null;
   mouseListenerSet: boolean = false;
+  checkpointStates: CheckpointState[] = [];
+  timer: TimerState = {
+    startTime: 0,
+    currentTime: 0,
+    isRunning: false,
+    finishTime: undefined,
+  };
+  private checkpointColliders: (RAPIER.Collider | null)[] = [];
 
   constructor(canvas: HTMLCanvasElement) {
     this.canvas = canvas;
@@ -48,6 +57,9 @@ export class Game {
       // Generate wall colliders
       this.generateWallColliders();
 
+      // Generate checkpoint colliders
+      this.initializeCheckpoints();
+
       // Create car at the level's start position
       const playerAI = new PlayerAI();
       playerAI.levelData = this.currentLevel;
@@ -61,17 +73,28 @@ export class Game {
           physicsScale: this.physicsScale,
         }),
       );
+
+      // Start the timer
+      this.startTimer();
     });
   }
 
   update(dt: number): void {
     if (this.world) {
+      // Update timer if running
+      if (this.timer.isRunning) {
+        this.timer.currentTime = performance.now();
+      }
+      
       this.world.step();
       for (const car of this.cars) {
         // Each wheel's friction is checked individually in the car's update method
         // Pass the current level data to the car's AI
         car.inputController.levelData = this.currentLevel;
         car.update(dt);
+        
+        // Check if car has passed any checkpoints
+        this.checkCheckpoints(car);
       }
     }
   }
@@ -91,6 +114,9 @@ export class Game {
     for (const car of this.cars) {
       car.draw(this.ctx);
     }
+    
+    // Draw timer and checkpoint status
+    this.drawTimerAndCheckpoints();
   }
 
   /**
@@ -245,11 +271,88 @@ export class Game {
   private drawCheckpoints(): void {
     if (!this.currentLevel.checkpoints) return;
 
-    this.ctx.fillStyle = "rgba(0, 255, 0, 0.2)";
-    for (const checkpoint of this.currentLevel.checkpoints) {
+    for (let i = 0; i < this.currentLevel.checkpoints.length; i++) {
+      const checkpoint = this.currentLevel.checkpoints[i];
+      const isCompleted = i < this.checkpointStates.length && this.checkpointStates[i].passed;
+      const isNext = i === this.checkpointStates.length;
+      
+      // Get checkpoint line information to visualize
+      if (i < this.checkpointLines.length) {
+        const checkpointData = this.checkpointLines[i];
+        
+        const startVertex = { x: checkpointData.startX / this.physicsScale, y: checkpointData.startY / this.physicsScale };
+        const endVertex = { x: checkpointData.endX / this.physicsScale, y: checkpointData.endY / this.physicsScale };
+        
+        // Draw the checkpoint line
+        if (isCompleted) {
+          this.ctx.strokeStyle = "rgba(0, 255, 0, 0.8)"; // Green for completed
+        } else if (isNext) {
+          this.ctx.strokeStyle = "rgba(255, 255, 0, 0.8)"; // Yellow for next
+        } else {
+          this.ctx.strokeStyle = "rgba(255, 0, 0, 0.4)"; // Red for future
+        }
+        
+        this.ctx.lineWidth = 4;
+        this.ctx.beginPath();
+        this.ctx.moveTo(startVertex.x * this.physicsScale, startVertex.y * this.physicsScale);
+        this.ctx.lineTo(endVertex.x * this.physicsScale, endVertex.y * this.physicsScale);
+        this.ctx.stroke();
+        
+        // Draw detection area for debugging
+        if (isNext) {
+          this.ctx.strokeStyle = "rgba(255, 255, 0, 0.3)";
+          this.ctx.beginPath();
+          
+          // Draw threshold area around the line
+          const dx = (endVertex.x - startVertex.x) * this.physicsScale;
+          const dy = (endVertex.y - startVertex.y) * this.physicsScale;
+          const lineLength = Math.sqrt(dx * dx + dy * dy);
+          const normalX = -dy / lineLength;
+          const normalY = dx / lineLength;
+          
+          const carRadius = Math.max(this.cars[0].carWidth, this.cars[0].carHeight) / 2;
+          
+          // Draw rectangle around the line to show detection area
+          this.ctx.moveTo(
+            (startVertex.x * this.physicsScale) + normalX * carRadius,
+            (startVertex.y * this.physicsScale) + normalY * carRadius
+          );
+          this.ctx.lineTo(
+            (endVertex.x * this.physicsScale) + normalX * carRadius,
+            (endVertex.y * this.physicsScale) + normalY * carRadius
+          );
+          this.ctx.lineTo(
+            (endVertex.x * this.physicsScale) - normalX * carRadius,
+            (endVertex.y * this.physicsScale) - normalY * carRadius
+          );
+          this.ctx.lineTo(
+            (startVertex.x * this.physicsScale) - normalX * carRadius,
+            (startVertex.y * this.physicsScale) - normalY * carRadius
+          );
+          this.ctx.closePath();
+          this.ctx.stroke();
+        }
+      }
+      
+      // Draw marker based on checkpoint status
+      if (isCompleted) {
+        this.ctx.fillStyle = "rgba(0, 255, 0, 0.5)"; // Green for completed
+      } else if (isNext) {
+        this.ctx.fillStyle = "rgba(255, 255, 0, 0.5)"; // Yellow for next
+      } else {
+        this.ctx.fillStyle = "rgba(255, 0, 0, 0.2)"; // Red for future
+      }
+      
       this.ctx.beginPath();
       this.ctx.arc(checkpoint.x, checkpoint.y, 10, 0, Math.PI * 2);
       this.ctx.fill();
+      
+      // Draw checkpoint number
+      this.ctx.fillStyle = "black";
+      this.ctx.font = "14px Arial";
+      this.ctx.textAlign = "center";
+      this.ctx.textBaseline = "middle";
+      this.ctx.fillText((i + 1).toString(), checkpoint.x, checkpoint.y);
     }
   }
 
@@ -299,6 +402,22 @@ export class Game {
       40,
       75,
     );
+    
+    // Checkpoint legend
+    this.ctx.fillStyle = "rgba(255, 255, 0, 0.5)";
+    this.ctx.fillRect(10, 90, 20, 20);
+    this.ctx.fillStyle = "white";
+    this.ctx.fillText("Next Checkpoint", 40, 105);
+    
+    this.ctx.fillStyle = "rgba(0, 255, 0, 0.5)";
+    this.ctx.fillRect(10, 120, 20, 20);
+    this.ctx.fillStyle = "white";
+    this.ctx.fillText("Completed Checkpoint", 40, 135);
+    
+    this.ctx.fillStyle = "rgba(255, 0, 0, 0.2)";
+    this.ctx.fillRect(10, 150, 20, 20);
+    this.ctx.fillStyle = "white";
+    this.ctx.fillText("Future Checkpoint", 40, 165);
   }
 
   private generateWallColliders(): void {
@@ -335,6 +454,216 @@ export class Game {
 
         const wallSegment = this.world.createCollider(wallSegmentDesc);
         this.wallColliders.push(wallSegment);
+      }
+    }
+  }
+  
+  /**
+   * Initialize checkpoints and create checkpoint lines
+   */
+  // Stores checkpoint line coordinates for each checkpoint
+  private checkpointLines: Array<{startX: number, startY: number, endX: number, endY: number}> = [];
+  
+  // No getCheckpointLineCoordinates method needed - we access checkpointLines directly
+  
+  private initializeCheckpoints(): void {
+    if (!this.world || !this.currentLevel.checkpoints) return;
+    
+    // Clear existing checkpoints
+    for (const collider of this.checkpointColliders) {
+      if (collider) {
+        this.world.removeCollider(collider, true);
+      }
+    }
+    this.checkpointColliders = [];
+    this.checkpointStates = [];
+    this.checkpointLines = [];
+    
+    // For each checkpoint in the level
+    for (let i = 0; i < this.currentLevel.checkpoints.length; i++) {
+      const checkpoint = this.currentLevel.checkpoints[i];
+      
+      // Find the nearest track segment to determine road direction
+      let minDistance = Number.MAX_VALUE;
+      let nearestSegmentIndex = 0;
+      
+      for (let j = 0; j < this.currentLevel.trackPath.length - 1; j++) {
+        const current = this.currentLevel.trackPath[j];
+        const next = this.currentLevel.trackPath[j + 1];
+        
+        const distSq = vec.pointToLineDistanceSquared(checkpoint, current, next);
+        if (distSq < minDistance) {
+          minDistance = distSq;
+          nearestSegmentIndex = j;
+        }
+      }
+      
+      // Get track direction at this point
+      const current = this.currentLevel.trackPath[nearestSegmentIndex];
+      const next = this.currentLevel.trackPath[nearestSegmentIndex + 1];
+      const direction = vec.subtract(next, current);
+      
+      // Create a perpendicular line with length = trackWidth * 1.5 to ensure detection
+      const perpendicular = vec.normal(vec.normalize(direction));
+      const halfWidth = this.currentLevel.trackWidth * 0.75; // Extra width for reliable detection
+      
+      const checkpointStart = vec.add(
+        checkpoint, 
+        vec.multiply(perpendicular, -halfWidth)
+      );
+      
+      const checkpointEnd = vec.add(
+        checkpoint,
+        vec.multiply(perpendicular, halfWidth)
+      );
+      
+      // Store checkpoint line coordinates for later use
+      this.checkpointLines.push({
+        startX: checkpointStart.x,
+        startY: checkpointStart.y,
+        endX: checkpointEnd.x,
+        endY: checkpointEnd.y
+      });
+      
+      // We don't need actual physical colliders for checkpoints
+      // Just store the line segment data for detection
+      this.checkpointColliders.push(null);
+    }
+    
+    // No need for physics-based contact detection
+  }
+  
+  /**
+   * Start the game timer
+   */
+  private startTimer(): void {
+    this.timer = {
+      startTime: performance.now(),
+      currentTime: performance.now(),
+      isRunning: true,
+      finishTime: undefined
+    };
+  }
+  
+  /**
+   * Stop the game timer
+   */
+  private stopTimer(): void {
+    this.timer.isRunning = false;
+    this.timer.finishTime = this.timer.currentTime;
+  }
+  
+  /**
+   * Format milliseconds as mm:ss.mmm
+   */
+  private formatTime(ms: number): string {
+    const totalSeconds = ms / 1000;
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    const milliseconds = Math.floor((ms % 1000) / 10);
+    
+    return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}.${milliseconds.toString().padStart(2, '0')}`;
+  }
+  
+  /**
+   * Draw timer and checkpoint status on screen
+   */
+  private drawTimerAndCheckpoints(): void {
+    // Draw timer
+    const elapsedTime = this.timer.currentTime - this.timer.startTime;
+    const timeText = this.formatTime(elapsedTime);
+    
+    // Timer display background
+    this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    this.ctx.fillRect(this.canvas.width - 160, 10, 150, 40);
+    
+    // Timer text
+    this.ctx.font = "24px monospace";
+    this.ctx.fillStyle = this.timer.isRunning ? "white" : "#00ff00";
+    this.ctx.textAlign = "right";
+    this.ctx.fillText(timeText, this.canvas.width - 20, 38);
+    
+    // Draw checkpoint progress
+    const totalCheckpoints = this.currentLevel.checkpoints?.length || 0;
+    const completedCheckpoints = this.checkpointStates.filter(c => c.passed).length;
+    
+    // Checkpoint progress background
+    this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+    this.ctx.fillRect(this.canvas.width - 160, 60, 150, 40);
+    
+    // Checkpoint progress text
+    this.ctx.font = "18px Arial";
+    this.ctx.fillStyle = "white";
+    this.ctx.textAlign = "right";
+    this.ctx.fillText(`${completedCheckpoints}/${totalCheckpoints}`, this.canvas.width - 20, 88);
+    
+    // If race is finished, show completion message
+    if (completedCheckpoints === totalCheckpoints && totalCheckpoints > 0) {
+      // Background for completion message
+      this.ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+      this.ctx.fillRect(this.canvas.width / 2 - 150, this.canvas.height / 2 - 50, 300, 100);
+      
+      // Completion message
+      this.ctx.font = "24px Arial";
+      this.ctx.fillStyle = "#00ff00";
+      this.ctx.textAlign = "center";
+      this.ctx.fillText("Track Completed!", this.canvas.width / 2, this.canvas.height / 2 - 15);
+      
+      // Final time
+      this.ctx.font = "20px monospace";
+      this.ctx.fillText(timeText, this.canvas.width / 2, this.canvas.height / 2 + 15);
+    }
+  }
+  
+  /**
+   * Check if the car has passed any checkpoints
+   */
+  private checkCheckpoints(car: Car): void {
+    if (!this.world || !this.currentLevel.checkpoints) return;
+    
+    // Check if we have any checkpoints left to pass
+    const nextCheckpointIndex = this.checkpointStates.length;
+    if (!this.currentLevel.checkpoints || nextCheckpointIndex >= this.currentLevel.checkpoints.length) return;
+    
+    // Get car position
+    const carPos = car.carBody.translation();
+    const carPosition = {
+      x: carPos.x * this.physicsScale,
+      y: carPos.y * this.physicsScale
+    };
+    
+    // Get checkpoint line endpoints from the stored coordinates
+    if (nextCheckpointIndex >= this.checkpointLines.length) return;
+    
+    const checkpointData = this.checkpointLines[nextCheckpointIndex];
+    
+    const lineStart = {
+      x: checkpointData.startX,
+      y: checkpointData.startY
+    };
+    
+    const lineEnd = {
+      x: checkpointData.endX,
+      y: checkpointData.endY
+    };
+    
+    // Check if car is close enough to the checkpoint line
+    const distanceToLine = vec.pointToLineDistanceSquared(carPosition, lineStart, lineEnd);
+    const carRadius = Math.max(car.carWidth, car.carHeight) / 2;
+    const thresholdDistance = carRadius * carRadius; // Square of detection radius
+    
+    // If car is close enough to the checkpoint line
+    if (distanceToLine <= thresholdDistance) {
+      // Mark this checkpoint as passed
+      this.checkpointStates.push({
+        index: nextCheckpointIndex,
+        passed: true,
+        timestamp: this.timer.currentTime - this.timer.startTime
+      });
+      
+      // If this was the last checkpoint, stop the timer
+      if (nextCheckpointIndex === this.currentLevel.checkpoints.length - 1) {
+        this.stopTimer();
       }
     }
   }

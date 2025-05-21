@@ -20,6 +20,13 @@ export interface CheckpointState {
   timestamp: number;
 }
 
+export interface TimerState {
+  startTime: number;
+  currentTime: number;
+  isRunning: boolean;
+  finishTime?: number;
+}
+
 export interface TerrainProperties {
   name: string;
   color: string;
