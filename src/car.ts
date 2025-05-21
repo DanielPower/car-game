@@ -59,6 +59,8 @@ export class Car {
   carHeight: number = 20;
   wheelWidth: number = 20;
   wheelHeight: number = 10;
+  carMass: number = 20;
+  wheelMass: number = 2;
 
   constructor({
     world,
@@ -79,6 +81,7 @@ export class Car {
 
     const carBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y);
     this.carBody = this.world.createRigidBody(carBodyDesc);
+    this.carBody.setAdditionalMass(this.carMass, false);
 
     const carColliderDesc = RAPIER.ColliderDesc.cuboid(
       this.carWidth / this.physicsScale / 2,
@@ -86,7 +89,7 @@ export class Car {
     )
       .setCollisionGroups(
         // Car is in CAR group and can collide with WALL group but not WHEEL group
-        (COLLISION_GROUPS.CAR << 16) | COLLISION_GROUPS.WALL
+        (COLLISION_GROUPS.CAR << 16) | COLLISION_GROUPS.WALL,
       )
       .setFriction(0.2);
     this.carCollider = this.world.createCollider(carColliderDesc, this.carBody);
@@ -131,17 +134,14 @@ export class Car {
     });
   }
 
-  private createWheel(
-    carX: number,
-    carY: number,
-    config: WheelConfig,
-  ): void {
+  private createWheel(carX: number, carY: number, config: WheelConfig): void {
     const wheelX = carX + config.offsetX / this.physicsScale;
     const wheelY = carY + config.offsetY / this.physicsScale;
     const wheelDesc = RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(wheelX, wheelY)
       .setUserData({ type: "wheel", wheelType: config.wheelType });
     const wheel = this.world.createRigidBody(wheelDesc) as WheelBody;
+    wheel.setAdditionalMass(this.wheelMass, false);
 
     const colliderDesc = RAPIER.ColliderDesc.cuboid(
       config.width / this.physicsScale / 2,
@@ -149,7 +149,7 @@ export class Car {
     )
       .setCollisionGroups(
         // Wheel is in WHEEL group and can collide with WALL group but not CAR group
-        (COLLISION_GROUPS.WHEEL << 16) | COLLISION_GROUPS.WALL
+        (COLLISION_GROUPS.WHEEL << 16) | COLLISION_GROUPS.WALL,
       )
       .setFriction(0.7);
     const collider = this.world.createCollider(colliderDesc, wheel);
@@ -228,7 +228,12 @@ export class Car {
         const forward = vec.fromAngle(wheel.rotation(), driveForce);
         wheel.applyImpulse(new RAPIER.Vector2(forward.x, forward.y), true);
       }
-      applyLateralFriction(wheel, wheelFriction * 0.1 * dt);
+      if (wheel.userData.wheelType === "front") {
+        applyLateralFriction(wheel, wheelFriction * 0.1 * dt);
+      }
+      if (wheel.userData.wheelType === "rear") {
+        applyLateralFriction(wheel, wheelFriction * 0.05 * dt);
+      }
     });
   }
 
