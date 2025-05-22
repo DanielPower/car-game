@@ -59,8 +59,8 @@ export class Car {
   carHeight: number = 20;
   wheelWidth: number = 20;
   wheelHeight: number = 10;
-  carMass: number = 20;
-  wheelMass: number = 2;
+  carMass: number = 10;
+  wheelMass: number = 1;
 
   constructor({
     world,
@@ -232,7 +232,7 @@ export class Car {
         applyLateralFriction(wheel, wheelFriction * 0.1 * dt);
       }
       if (wheel.userData.wheelType === "rear") {
-        applyLateralFriction(wheel, wheelFriction * 0.05 * dt);
+        applyLateralFriction(wheel, wheelFriction * 0.07 * dt);
       }
     });
   }
