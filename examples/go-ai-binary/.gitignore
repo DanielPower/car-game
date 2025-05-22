@@ -1,0 +1,20 @@
+# Go build artifacts
+/dist/
+*.wasm
+*.js
+
+# Go module files (keep go.mod if it exists, but ignore go.sum if generated)
+go.sum
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Build cache
+.cache/

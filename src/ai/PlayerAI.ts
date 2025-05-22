@@ -1,6 +1,4 @@
 import type { CarAI, CarAIInput, CarAIOutput } from "./CarAI";
-import type { LevelConfig } from "../types";
-import { level1 } from "../levels/level1";
 
 /**
  * Maps keyboard keys to car control actions
@@ -14,7 +12,6 @@ interface KeyMap {
 
 export class PlayerAI implements CarAI {
   private keys: Set<string> = new Set();
-  levelData: LevelConfig = level1;
   
   // Key mapping configuration
   private keyMap: KeyMap = {
@@ -57,11 +54,6 @@ export class PlayerAI implements CarAI {
   }
 
   process(input: CarAIInput): CarAIOutput {
-    // Update the level data from input
-    if (input.level) {
-      this.levelData = input.level;
-    }
-    
     // Calculate steering angle based on key input
     let steeringAngle = 0;
     if (this.isActionActive('left')) steeringAngle -= 1;

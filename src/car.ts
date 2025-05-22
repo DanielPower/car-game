@@ -2,7 +2,7 @@ import * as RAPIER from "@dimforge/rapier2d-compat";
 import { COLLISION_GROUPS } from "./game";
 import type { CarAI } from "./ai/CarAI";
 import * as vec from "./utils/math";
-import type { Vec2 } from "./types";
+import type { Vec2, LevelConfig } from "./types";
 import { isPointOnRoad } from "./utils/road";
 
 interface WheelConfig {
@@ -55,6 +55,7 @@ export class Car {
   joints: RAPIER.ImpulseJoint[];
   inputController: CarAI;
   physicsScale: number;
+  level: LevelConfig;
   carWidth: number = 50;
   carHeight: number = 20;
   wheelWidth: number = 20;
@@ -68,16 +69,19 @@ export class Car {
     x,
     y,
     physicsScale,
+    level,
   }: {
     world: RAPIER.World;
     inputController: CarAI;
     x: number;
     y: number;
     physicsScale: number;
+    level: LevelConfig;
   }) {
     this.world = world;
     this.inputController = inputController;
     this.physicsScale = physicsScale;
+    this.level = level;
 
     const carBodyDesc = RAPIER.RigidBodyDesc.dynamic().setTranslation(x, y);
     this.carBody = this.world.createRigidBody(carBodyDesc);
@@ -184,7 +188,7 @@ export class Car {
 
   isWheelOnRoad(wheel: RAPIER.RigidBody): boolean {
     const wheelPos = this.getWheelPosition(wheel);
-    return isPointOnRoad(wheelPos, this.inputController.levelData);
+    return isPointOnRoad(wheelPos, this.level);
   }
 
   update(dt: number): void {
@@ -203,16 +207,15 @@ export class Car {
       height: this.carHeight,
       roadWidth: 800,
       roadHeight: 600,
-      deltaTime: dt,
-      level: this.inputController.levelData,
+      deltaTime: dt
     });
 
     const steeringRadians = (inputs.steeringAngle * Math.PI) / 5; // scale -1...1 to -π/5...π/5
     this.wheels.forEach((wheel, index) => {
       const isOnRoad = this.isWheelOnRoad(wheel);
       const wheelFriction = isOnRoad
-        ? this.inputController.levelData.roadFriction
-        : this.inputController.levelData.offRoadFriction;
+        ? this.level.roadFriction
+        : this.level.offRoadFriction;
 
       this.wheelColliders[index].setFriction(wheelFriction);
 

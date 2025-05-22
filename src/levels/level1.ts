@@ -4,7 +4,7 @@ export const level1: LevelConfig = {
   trackWidth: 120,
   roadFriction: 0.7,
   offRoadFriction: 0.3,
-  startPosition: { x: 400, y: 300 },
+  startPosition: { x: 100, y: 100 },
   trackPath: [
     { x: 400, y: 150, isControlPoint: true },
     { x: 600, y: 150 },

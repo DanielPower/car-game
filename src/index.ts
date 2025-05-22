@@ -1,5 +1,6 @@
 import { setupErrorToasts } from "./errors";
 import { Game } from "./game";
+import { loadRustAI } from "./ai/wasm/loadWasmAI";
 
 document.addEventListener("DOMContentLoaded", async () => {
   setupErrorToasts();
@@ -24,7 +25,10 @@ document.addEventListener("DOMContentLoaded", async () => {
   canvas.width = maxWidth;
   canvas.height = maxHeight;
 
-  const game = new Game(canvas);
+  // Load the Rust AI
+  const rustAI = await loadRustAI();
+  
+  const game = new Game(canvas, rustAI);
 
   let lastRenderTime = performance.now();
   const updateLoop = () => {

@@ -1,0 +1,16 @@
+[package]
+name = "car-ai-binary"
+version = "0.1.0"
+edition = "2021"
+description = "Example Car AI implementation for WebAssembly with binary interface"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+# No JSON dependencies needed for binary interface!
+
+[profile.release]
+lto = true
+opt-level = 's'
+codegen-units = 1  # Better optimization

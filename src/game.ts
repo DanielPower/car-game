@@ -1,6 +1,7 @@
 import * as RAPIER from "@dimforge/rapier2d-compat";
 import { Car } from "./car";
 import { PlayerAI } from "./ai/PlayerAI";
+import type { CarAI } from "./ai/CarAI";
 import { level1 } from "./levels/level1";
 import type { CheckpointState, LevelConfig, TimerState } from "./types";
 import * as vec from "./utils/math";
@@ -38,7 +39,7 @@ export class Game {
   };
   private checkpointColliders: (RAPIER.Collider | null)[] = [];
 
-  constructor(canvas: HTMLCanvasElement) {
+  constructor(canvas: HTMLCanvasElement, customAI?: CarAI) {
     this.canvas = canvas;
     this.ctx = canvas.getContext("2d")!;
 
@@ -61,8 +62,8 @@ export class Game {
       this.initializeCheckpoints();
 
       // Create car at the level's start position
-      const playerAI = new PlayerAI();
-      playerAI.levelData = this.currentLevel;
+      // Use custom AI if provided, otherwise use PlayerAI
+      const playerAI = customAI || new PlayerAI();
 
       this.cars.push(
         new Car({
@@ -71,6 +72,7 @@ export class Game {
           x: this.currentLevel.startPosition.x / this.physicsScale,
           y: this.currentLevel.startPosition.y / this.physicsScale,
           physicsScale: this.physicsScale,
+          level: this.currentLevel,
         }),
       );
 
@@ -89,8 +91,7 @@ export class Game {
       this.world.step();
       for (const car of this.cars) {
         // Each wheel's friction is checked individually in the car's update method
-        // Pass the current level data to the car's AI
-        car.inputController.levelData = this.currentLevel;
+        // We no longer need to pass level data to the AI
         car.update(dt);
         
         // Check if car has passed any checkpoints
