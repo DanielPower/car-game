@@ -18,16 +18,18 @@ pub extern "C" fn process(
     car_height: f32,
     road_width: f32,
     road_height: f32,
+    next_waypoint_x: f32,
+    next_waypoint_y: f32,
     delta_time: f32,
 ) -> u32 {
-    // Simple AI logic: stay in center of road
-    let center_x = road_width / 2.0;
-    let position_error = x - center_x;
-    let normalized_error = position_error / center_x;
+    // Calculate direction to next waypoint
+    let dx = next_waypoint_x - x;
+    let dy = next_waypoint_y - y;
+    let target_angle = dy.atan2(dx);
     
-    // Calculate steering to move toward center
-    let steering_angle = -normalized_error * 2.0;
-    let steering_angle = steering_angle.clamp(-1.0, 1.0);
+    // Calculate steering to turn toward waypoint
+    let angle_diff = target_angle - rotation;
+    let steering_angle = angle_diff.clamp(-1.0, 1.0);
     
     // Speed control
     let target_speed = 15.0;

@@ -9,6 +9,10 @@ export interface CarAIInput {
   roadWidth: number;
   roadHeight: number;
 
+  // Next waypoint/checkpoint location
+  nextWaypointX: number;
+  nextWaypointY: number;
+
   deltaTime: number;
 }
 

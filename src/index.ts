@@ -26,8 +26,16 @@ document.addEventListener("DOMContentLoaded", async () => {
   canvas.height = maxHeight;
 
   // Load the Simple AI
-  console.log("Loading Simple AI...");
-  const ai = await SimpleWasmAIAdapter.loadAI('./car_ai_simple.wasm');
+  let ai;
+  try {
+    console.log("Loading Simple AI...");
+    ai = await SimpleWasmAIAdapter.loadAI('./car_ai_simple.wasm');
+  } catch (error) {
+    console.warn("Failed to load Simple AI, using player controls:", error);
+    // Fall back to player AI if WASM loading fails
+    const { PlayerAI } = await import("./ai/PlayerAI");
+    ai = new PlayerAI();
+  }
   
   const game = new Game(canvas, ai);
 

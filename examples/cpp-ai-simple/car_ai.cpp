@@ -16,16 +16,18 @@ extern "C" unsigned int process(
     float car_height,
     float road_width,
     float road_height,
+    float next_waypoint_x,
+    float next_waypoint_y,
     float delta_time
 ) {
-    // Simple AI logic: stay in center of road
-    float center_x = road_width / 2.0f;
-    float position_error = x - center_x;
-    float normalized_error = position_error / center_x;
+    // Calculate direction to next waypoint
+    float dx = next_waypoint_x - x;
+    float dy = next_waypoint_y - y;
+    float target_angle = std::atan2(dy, dx);
     
-    // Calculate steering to move toward center
-    float steering_angle = -normalized_error * 2.0f;
-    steering_angle = std::max(-1.0f, std::min(1.0f, steering_angle));
+    // Calculate steering to turn toward waypoint
+    float angle_diff = target_angle - rotation;
+    float steering_angle = std::max(-1.0f, std::min(1.0f, angle_diff));
     
     // Speed control
     const float target_speed = 15.0f;

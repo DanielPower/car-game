@@ -65,10 +65,12 @@ const ai = await SimpleWasmAIAdapter.loadAI('./my-ai.wasm');
 ## Example AI Strategy
 
 ```rust
-// Stay in center of road
-let center_x = road_width / 2.0;
-let position_error = x - center_x;
-let steering_angle = -position_error / center_x;
+// Navigate toward next waypoint/checkpoint
+let dx = next_waypoint_x - x;
+let dy = next_waypoint_y - y;
+let target_angle = dy.atan2(dx);
+let angle_diff = target_angle - rotation;
+let steering_angle = angle_diff.clamp(-1.0, 1.0);
 
 // Speed management
 let accelerate = speed < 15.0;
@@ -84,7 +86,8 @@ Your AI exports one function:
 pub extern "C" fn process(
     x: f32, y: f32, speed: f32, rotation: f32,
     car_width: f32, car_height: f32,
-    road_width: f32, road_height: f32, delta_time: f32
+    road_width: f32, road_height: f32,
+    next_waypoint_x: f32, next_waypoint_y: f32, delta_time: f32
 ) -> u32
 ```
 
@@ -92,6 +95,8 @@ Return format (packed 32-bit integer):
 - Bit 31: accelerate (1 = true, 0 = false)
 - Bit 30: brake (1 = true, 0 = false)  
 - Bits 15-0: steering angle (-32768 to 32767 maps to -1.0 to 1.0)
+
+The AI receives the location of the next checkpoint/waypoint it should navigate toward.
 
 ## Troubleshooting
 

@@ -90,9 +90,11 @@ export class Game {
       
       this.world.step();
       for (const car of this.cars) {
+        // Get next waypoint for this car
+        const nextWaypoint = this.getNextWaypoint();
+        
         // Each wheel's friction is checked individually in the car's update method
-        // We no longer need to pass level data to the AI
-        car.update(dt);
+        car.update(dt, nextWaypoint);
         
         // Check if car has passed any checkpoints
         this.checkCheckpoints(car);
@@ -616,6 +618,20 @@ export class Game {
     }
   }
   
+  /**
+   * Get the next waypoint/checkpoint that the car should head towards
+   */
+  private getNextWaypoint(): { x: number; y: number } | undefined {
+    if (!this.currentLevel.checkpoints) return undefined;
+    
+    const nextCheckpointIndex = this.checkpointStates.length;
+    if (nextCheckpointIndex >= this.currentLevel.checkpoints.length) {
+      return undefined;
+    }
+    
+    return this.currentLevel.checkpoints[nextCheckpointIndex];
+  }
+
   /**
    * Check if the car has passed any checkpoints
    */

@@ -13,6 +13,8 @@ interface SimpleWasmAIModule {
     carHeight: number,
     roadWidth: number,
     roadHeight: number,
+    nextWaypointX: number,
+    nextWaypointY: number,
     deltaTime: number
   ) => number;
 }
@@ -81,6 +83,8 @@ export class SimpleWasmAIAdapter implements CarAI {
       input.height,
       input.roadWidth,
       input.roadHeight,
+      input.nextWaypointX,
+      input.nextWaypointY,
       input.deltaTime
     );
     

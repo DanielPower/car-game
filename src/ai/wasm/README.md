@@ -19,15 +19,17 @@ Your WebAssembly module exports a single function that takes game state as param
 ```rust
 #[no_mangle]
 pub extern "C" fn process(
-    x: f32,              // Car's X position
-    y: f32,              // Car's Y position  
-    speed: f32,          // Car's current speed
-    rotation: f32,       // Car's rotation in radians
-    car_width: f32,      // Car's width
-    car_height: f32,     // Car's height
-    road_width: f32,     // Road width
-    road_height: f32,    // Road height
-    delta_time: f32      // Time since last frame
+    x: f32,                // Car's X position
+    y: f32,                // Car's Y position  
+    speed: f32,            // Car's current speed
+    rotation: f32,         // Car's rotation in radians
+    car_width: f32,        // Car's width
+    car_height: f32,       // Car's height
+    road_width: f32,       // Road width
+    road_height: f32,      // Road height
+    next_waypoint_x: f32,  // Next waypoint X position
+    next_waypoint_y: f32,  // Next waypoint Y position
+    delta_time: f32        // Time since last frame
 ) -> u32;
 ```
 
@@ -45,11 +47,15 @@ Return a 32-bit unsigned integer with packed control values:
 pub extern "C" fn process(
     x: f32, y: f32, speed: f32, rotation: f32,
     car_width: f32, car_height: f32,
-    road_width: f32, road_height: f32, delta_time: f32
+    road_width: f32, road_height: f32,
+    next_waypoint_x: f32, next_waypoint_y: f32, delta_time: f32
 ) -> u32 {
-    // Stay in center of road
-    let center_x = road_width / 2.0;
-    let steering_angle = -(x - center_x) / center_x;
+    // Steer toward next waypoint
+    let dx = next_waypoint_x - x;
+    let dy = next_waypoint_y - y;
+    let target_angle = dy.atan2(dx);
+    let angle_diff = target_angle - rotation;
+    let steering_angle = angle_diff.clamp(-1.0, 1.0);
     
     // Speed control
     let accelerate = speed < 15.0;
@@ -113,6 +119,8 @@ const controls = ai.process({
   height: car.height,
   roadWidth: level.roadWidth,
   roadHeight: level.roadHeight,
+  nextWaypointX: nextWaypoint.x,
+  nextWaypointY: nextWaypoint.y,
   deltaTime: deltaTime
 });
 

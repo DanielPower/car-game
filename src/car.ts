@@ -191,11 +191,17 @@ export class Car {
     return isPointOnRoad(wheelPos, this.level);
   }
 
-  update(dt: number): void {
+  update(dt: number, nextWaypoint?: { x: number; y: number }): void {
     const carPosition = this.carBody.translation();
     const carRotation = this.carBody.rotation();
     const carVelocity = this.carBody.linvel();
     const speed = vec.length({ x: carVelocity.x, y: carVelocity.y });
+
+    // Use default waypoint if none provided (center of road ahead)
+    const defaultWaypoint = {
+      x: carPosition.x * this.physicsScale,
+      y: (carPosition.y * this.physicsScale) + 100
+    };
 
     // Process AI/player inputs
     const inputs = this.inputController.process({
@@ -207,6 +213,8 @@ export class Car {
       height: this.carHeight,
       roadWidth: 800,
       roadHeight: 600,
+      nextWaypointX: nextWaypoint?.x ?? defaultWaypoint.x,
+      nextWaypointY: nextWaypoint?.y ?? defaultWaypoint.y,
       deltaTime: dt
     });
 
