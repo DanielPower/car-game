@@ -1,6 +1,6 @@
 import { setupErrorToasts } from "./errors";
 import { Game } from "./game";
-import { loadRustAI } from "./ai/wasm/loadWasmAI";
+import { SimpleWasmAIAdapter } from "./ai/wasm/SimpleWasmAIAdapter";
 
 document.addEventListener("DOMContentLoaded", async () => {
   setupErrorToasts();
@@ -25,10 +25,11 @@ document.addEventListener("DOMContentLoaded", async () => {
   canvas.width = maxWidth;
   canvas.height = maxHeight;
 
-  // Load the Rust AI
-  const rustAI = await loadRustAI();
+  // Load the Simple AI
+  console.log("Loading Simple AI...");
+  const ai = await SimpleWasmAIAdapter.loadAI('./car_ai_simple.wasm');
   
-  const game = new Game(canvas, rustAI);
+  const game = new Game(canvas, ai);
 
   let lastRenderTime = performance.now();
   const updateLoop = () => {

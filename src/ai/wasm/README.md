@@ -1,141 +1,122 @@
-# WebAssembly Binary Interface for Car Game
+# WebAssembly Car AI Interface
 
-This document describes the binary interface for implementing AI drivers in WebAssembly for the Car Game AI competition.
+This document describes how to implement AI drivers in WebAssembly for the Car Game AI competition.
 
-## Overview
+## Quick Start
 
-The Car Game WebAssembly Binary Interface allows you to implement your car AI in any language that compiles to WebAssembly. Your AI will be loaded into the game, and the game will call your AI's functions to get your car's controls.
+```javascript
+import { SimpleWasmAIAdapter } from './ai/wasm/SimpleWasmAIAdapter';
 
-## Required Exports
+const ai = await SimpleWasmAIAdapter.loadAI('./my-ai.wasm');
+```
 
-Your WebAssembly module must export the following function:
+## How It Works
 
-### `process(x: number, y: number, speed: number, rotation: number, carWidth: number, carHeight: number, roadWidth: number, roadHeight: number, deltaTime: number, outputPtr: number): void`
+Your WebAssembly module exports a single function that takes game state as parameters and returns control commands as a packed integer.
 
-This function is called every game tick to get your car's controls.
+### Required Export
 
-Parameters:
-- `x`: Car's X position
-- `y`: Car's Y position
-- `speed`: Car's current speed
-- `rotation`: Car's rotation in radians
-- `carWidth`: Car's width
-- `carHeight`: Car's height
-- `roadWidth`: Width of the road
-- `roadHeight`: Height of the road
-- `deltaTime`: Time since last frame in seconds
-- `outputPtr`: A pointer to the memory location where you should write your output data
+```rust
+#[no_mangle]
+pub extern "C" fn process(
+    x: f32,              // Car's X position
+    y: f32,              // Car's Y position  
+    speed: f32,          // Car's current speed
+    rotation: f32,       // Car's rotation in radians
+    car_width: f32,      // Car's width
+    car_height: f32,     // Car's height
+    road_width: f32,     // Road width
+    road_height: f32,    // Road height
+    delta_time: f32      // Time since last frame
+) -> u32;
+```
 
-### Optional Exports
+### Return Value Format
 
-- `allocate(size: number): number`: Allocates memory and returns a pointer
-- `deallocate(ptr: number, size: number): void`: Frees previously allocated memory
+Return a 32-bit unsigned integer with packed control values:
+- Bit 31: accelerate (1 = true, 0 = false)
+- Bit 30: brake (1 = true, 0 = false)  
+- Bits 15-0: steering angle as signed 16-bit integer (-32768 to 32767 maps to -1.0 to 1.0)
 
-## Output Data Format
+### Example Implementation
 
-Your AI should write its output to the memory location specified by `outputPtr` in the following binary format:
+```rust
+#[no_mangle]
+pub extern "C" fn process(
+    x: f32, y: f32, speed: f32, rotation: f32,
+    car_width: f32, car_height: f32,
+    road_width: f32, road_height: f32, delta_time: f32
+) -> u32 {
+    // Stay in center of road
+    let center_x = road_width / 2.0;
+    let steering_angle = -(x - center_x) / center_x;
+    
+    // Speed control
+    let accelerate = speed < 15.0;
+    let brake = speed > 20.0;
+    
+    // Pack return value
+    let mut packed: u32 = 0;
+    if accelerate { packed |= 0x80000000; }
+    if brake { packed |= 0x40000000; }
+    packed |= ((steering_angle * 32767.0) as i16 as u16) as u32;
+    
+    packed
+}
+```
 
-1. `outputPtr + 0`: Accelerate flag (4 bytes, uint32, 0 = false, 1 = true)
-2. `outputPtr + 4`: Brake flag (4 bytes, uint32, 0 = false, 1 = true)
-3. `outputPtr + 8`: Steering angle (4 bytes, float32, -1.0 = full left, 1.0 = full right)
+## Examples
 
-Total output size: 12 bytes
+- [Rust Example](../../examples/rust-ai-simple/)
+- [C++ Example](../../examples/cpp-ai-simple/)
 
-## Implementation Examples
-
-We provide examples for implementing the Car AI in various languages:
-
-- [Rust Example](../../examples/rust-ai-binary/)
-- [C++ Example](../../examples/cpp-ai-binary/)
-- [Go Example (TinyGo)](../../examples/go-ai-binary/)
-
-## Language-Specific Guidance
+## Building
 
 ### Rust
+```bash
+cargo build --target wasm32-unknown-unknown --release
+```
 
-The Rust implementation should access and manipulate memory directly using pointers.
-
-### C/C++
-
-Use Emscripten to compile your code to WebAssembly.
-
-### Go
-
-Use TinyGo with the WebAssembly target. Standard Go's WebAssembly output is too large for this application.
-
-### AssemblyScript
-
-Use the `@assemblyscript/loader` package for memory management.
+### C++
+```bash
+emcc -O3 -s WASM=1 car_ai.cpp -o car_ai.wasm
+```
 
 ## Debugging
 
-To debug your AI, you can use the following methods:
+Use the `consoleLog` import for debugging:
 
-1. Add a `consoleLog` import function:
-   ```js
-   env: {
-     consoleLog: (ptr, len) => {
-       const memory = new Uint8Array(wasmModule.memory.buffer);
-       const text = new TextDecoder().decode(memory.slice(ptr, ptr + len));
-       console.log(`[WASM AI]: ${text}`);
-     }
-   }
-   ```
+```rust
+#[link(wasm_import_module = "env")]
+extern "C" {
+    fn consoleLog(value: f32);
+}
 
-2. Then in your code, call this function to log messages to the browser console.
+// In your code
+unsafe { consoleLog(steering_angle); }
+```
 
-## Performance Considerations
-
-1. Direct memory access is faster than JSON parsing
-2. Fixed memory layout allows for predictable access patterns
-3. No need for serialization/deserialization libraries
-4. Minimize memory allocations and deallocations
-
-## Testing Your AI
-
-1. Build your WebAssembly module
-2. Load it into the game using the `BinaryWasmAIAdapter`
-3. Test your AI against the provided tracks
-
-## Submission Guidelines
-
-1. Submit only the compiled WebAssembly (.wasm) file
-2. Your module must implement all required exports
-3. Your module should not exceed 1MB in size
-4. Your AI must complete each track within the time limits
-
-## Example Usage
+## Using in Game
 
 ```javascript
-// In your game code
-import { BinaryWasmAIAdapter } from './ai/wasm/BinaryWasmAIAdapter';
+import { SimpleWasmAIAdapter } from './ai/wasm/SimpleWasmAIAdapter';
 
-// Load an AI implementation
-const ai = await BinaryWasmAIAdapter.loadAI('path/to/your-ai.wasm');
+const ai = await SimpleWasmAIAdapter.loadAI('./car_ai.wasm');
 
-// Use the AI in your game loop
-function gameLoop(deltaTime) {
-  // Get car state
-  const carState = {
-    x: car.x,
-    y: car.y,
-    speed: car.speed,
-    rotation: car.rotation,
-    width: car.width,
-    height: car.height,
-    roadWidth: level.roadWidth,
-    roadHeight: level.roadHeight,
-    deltaTime: deltaTime
-  };
-  
-  // Get AI decisions
-  const controls = ai.process(carState);
-  
-  // Apply controls to the car
-  car.accelerate = controls.accelerate;
-  car.brake = controls.brake;
-  car.steeringAngle = controls.steeringAngle;
-  
-  // Update car physics, etc.
-}
+// In game loop
+const controls = ai.process({
+  x: car.x,
+  y: car.y,
+  speed: car.speed,
+  rotation: car.rotation,
+  width: car.width,
+  height: car.height,
+  roadWidth: level.roadWidth,
+  roadHeight: level.roadHeight,
+  deltaTime: deltaTime
+});
+
+car.accelerate = controls.accelerate;
+car.brake = controls.brake;
+car.steeringAngle = controls.steeringAngle;
 ```

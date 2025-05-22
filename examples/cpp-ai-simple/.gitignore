@@ -1,0 +1,9 @@
+*.wasm
+*.js
+*.o
+*.a
+.DS_Store
+build/
+cmake-build-*/
+.vscode/
+.idea/

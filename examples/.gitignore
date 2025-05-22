@@ -1,0 +1,21 @@
+# Build artifacts
+*.wasm
+*.js
+*.map
+
+# Rust
+target/
+Cargo.lock
+
+# C++
+*.o
+*.a
+build/
+cmake-build-*/
+
+# General
+.DS_Store
+.vscode/
+.idea/
+*.tmp
+*.log
